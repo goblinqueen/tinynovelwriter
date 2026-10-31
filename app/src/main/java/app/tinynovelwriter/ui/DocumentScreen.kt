@@ -1,5 +1,6 @@
 package app.tinynovelwriter.ui
 
+import app.tinynovelwriter.format.ItemClass
 import app.tinynovelwriter.resolve
 import app.tinynovelwriter.R
 import androidx.compose.ui.res.stringResource
@@ -122,7 +123,7 @@ fun DocumentScreen(
                     is EditorStatus.Unavailable -> Message(status.message.resolve())
                     else ->
                         if (text.isBlank() && !editor.editing) Message(stringResource(R.string.document_empty))
-                        else DocumentText(editor.value, editor::onValueChange, readOnly = !editor.editing)
+                        else DocumentText(editor.value, editor::onValueChange, readOnly = !editor.editing, editor.item?.itemClass)
                 }
             }
         }
@@ -151,9 +152,15 @@ private fun Banner(message: String, color: Color, actions: @Composable () -> Uni
 
 /** The document body. The same field is the viewer (read-only) and the editor. */
 @Composable
-private fun DocumentText(value: TextFieldValue, onValueChange: (TextFieldValue) -> Unit, readOnly: Boolean) {
+private fun DocumentText(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    readOnly: Boolean,
+    itemClass: ItemClass?,
+) {
     val colors = MaterialTheme.colorScheme
-    val markup = remember(colors) { MarkupTransformation(MarkupColors(colors.primary, colors.outline)) }
+    val markupColors = TinyColors.markup
+    val markup = remember(markupColors, itemClass) { MarkupTransformation(markupColors, itemClass ?: ItemClass.NOVEL) }
     val scroll = rememberScrollState()
     // Tapping Edit leaves focus on the button, so a hardware keyboard's arrow keys would
     // move between buttons. Put focus in the text when editing starts.

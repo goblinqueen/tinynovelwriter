@@ -47,6 +47,32 @@ class RealProjectTest {
         println("Word counts matching the project file: $wordCountMatches of ${files.size}")
     }
 
+    /** Highlights every document; reports only span counts per kind and timings. */
+    @Test
+    fun highlightsEveryDocument() {
+        assumeTrue("NW_PROJECT not set", root != null && File(root, "nwProject.nwx").isFile)
+        val project = File(root, "nwProject.nwx").inputStream().use(ProjectXml::parse)
+        val files = File(root, "content").listFiles { f -> f.extension == "md" && isHandle(f.nameWithoutExtension) }!!
+
+        val kinds = sortedMapOf<Markup, Int>()
+        var slowest = 0L to ""
+        for (file in files) {
+            val doc = DocumentReader.parse(file.readBytes())
+            val itemClass = project.items[file.nameWithoutExtension]?.itemClass ?: ItemClass.NOVEL
+            Highlighter.highlight(doc.text, itemClass) // warm-up
+            val started = System.nanoTime()
+            val spans = Highlighter.highlight(doc.text, itemClass)
+            val micros = (System.nanoTime() - started) / 1000
+            if (micros > slowest.first) slowest = micros to "${file.nameWithoutExtension} (${doc.text.length} chars)"
+            for (span in spans) {
+                assertTrue(span.start in 0 until span.end && span.end <= doc.text.length)
+                kinds.merge(span.kind, 1, Int::plus)
+            }
+        }
+        println("Highlight spans by kind: $kinds")
+        println("Slowest: ${slowest.first} µs for ${slowest.second}")
+    }
+
     /**
      * Re-saving unchanged text must give back the exact bytes novelWriter wrote. Failures
      * report only the handle and a byte offset, never content.

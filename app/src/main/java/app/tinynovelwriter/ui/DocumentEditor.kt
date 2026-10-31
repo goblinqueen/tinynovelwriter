@@ -10,6 +10,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import app.tinynovelwriter.data.OpenedDocument
 import app.tinynovelwriter.data.ProjectFolder
 import app.tinynovelwriter.data.SaveResult
+import app.tinynovelwriter.format.AutoReplace
 import app.tinynovelwriter.format.HeaderItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -61,7 +62,12 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
         }
         // Pasted text may bring CR line endings; the document is LF in memory.
         val text = new.text
-        value = if ('\r' in text) new.copy(text = text.replace("\r\n", "\n").replace('\r', '\n')) else new
+        val replaced = if (new.selection.collapsed) AutoReplace.afterTyping(value.text, text, new.selection.start) else null
+        value = when {
+            replaced != null -> TextFieldValue(replaced.first, TextRange(replaced.second))
+            '\r' in text -> new.copy(text = text.replace("\r\n", "\n").replace('\r', '\n'))
+            else -> new
+        }
         if (status is EditorStatus.Failed) status = EditorStatus.Idle
     }
 

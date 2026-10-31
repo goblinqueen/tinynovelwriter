@@ -3,43 +3,84 @@ package app.tinynovelwriter.ui
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
+import app.tinynovelwriter.format.Highlighter
+import app.tinynovelwriter.format.ItemClass
+import app.tinynovelwriter.format.Markup
+import app.tinynovelwriter.format.MarkupSpan
 
-/** Colours for novelWriter markup; [heading] is the text, [headingMarker] the `#` marks. */
-data class MarkupColors(val heading: Color, val headingMarker: Color)
+/** Colours for novelWriter markup, named after novelWriter's syntax theme entries. */
+data class MarkupColors(
+    val headerText: Color,
+    val headerTag: Color,
+    val emphasis: Color,
+    val hidden: Color,
+    val link: Color,
+    val note: Color,
+    val shortcode: Color,
+    val keyword: Color,
+    val tag: Color,
+    val value: Color,
+    val optional: Color,
+    val modifier: Color,
+    val replaceTag: Color,
+    val textHighlight: Color,
+    val whitespace: Color,
+)
 
-/** Heading prefixes as novelWriter's highlighter checks them; longer `#` runs first. */
-private val HEADING_PREFIXES = listOf("#### ", "###! ", "### ", "##! ", "## ", "#! ", "# ")
+/** novelWriter's editor styles (`GuiDocHighlighter.initHighlighter`), headings at normal size. */
+private fun MarkupColors.style(kind: Markup): SpanStyle = when (kind) {
+    Markup.HEADING_MARK -> SpanStyle(color = headerTag, fontWeight = FontWeight.Bold)
+    Markup.HEADING -> SpanStyle(color = headerText, fontWeight = FontWeight.Bold)
+    Markup.BOLD -> SpanStyle(color = emphasis, fontWeight = FontWeight.Bold)
+    Markup.ITALIC -> SpanStyle(color = emphasis, fontStyle = FontStyle.Italic)
+    Markup.STRIKE -> SpanStyle(color = hidden, textDecoration = TextDecoration.LineThrough)
+    Markup.MARK -> SpanStyle(background = textHighlight)
+    Markup.NOBREAK -> SpanStyle(background = whitespace)
+    Markup.MARKUP, Markup.HIDDEN -> SpanStyle(color = hidden)
+    Markup.LINK -> SpanStyle(color = link, textDecoration = TextDecoration.Underline)
+    Markup.NOTE -> SpanStyle(color = note)
+    Markup.CODE -> SpanStyle(color = shortcode)
+    Markup.KEYWORD -> SpanStyle(color = keyword)
+    Markup.TAG -> SpanStyle(color = tag, textDecoration = TextDecoration.Underline)
+    Markup.VALUE -> SpanStyle(color = value)
+    Markup.OPTIONAL -> SpanStyle(color = optional)
+    Markup.MODIFIER -> SpanStyle(color = modifier)
+    Markup.REPLACE -> SpanStyle(color = replaceTag)
+}
 
 /**
  * Styles novelWriter markup without changing the text, so it works the same for a
- * read-only view and an editor. Headings are bold and coloured at normal size, with
- * the marks visible, like novelWriter's editor with heading scaling off.
+ * read-only view and an editor. The marks stay visible, as in novelWriter's editor.
  */
-fun highlightMarkup(text: String, colors: MarkupColors): AnnotatedString = buildAnnotatedString {
-    append(text)
-    var start = 0
-    while (start <= text.length) {
-        val end = text.indexOf('\n', start).let { if (it < 0) text.length else it }
-        val prefix = HEADING_PREFIXES.firstOrNull { text.startsWith(it, start) }
-        if (prefix != null) {
-            val markerEnd = start + prefix.length - 1
-            addStyle(SpanStyle(color = colors.headingMarker, fontWeight = FontWeight.Bold), start, markerEnd)
-            addStyle(SpanStyle(color = colors.heading, fontWeight = FontWeight.Bold), markerEnd, end)
-        }
-        start = end + 1
+class MarkupTransformation(private val colors: MarkupColors, private val itemClass: ItemClass) : VisualTransformation {
+
+    private val styles = Markup.entries.associateWith { colors.style(it) }
+
+    // filter() runs on the whole text after every keystroke; lines are cached so only
+    // changed ones are highlighted again. Cleared when it grows past any likely document.
+    private val lineCache = HashMap<String, List<MarkupSpan>>()
+
+    private fun cachedLine(line: String, inactive: Boolean): List<MarkupSpan> {
+        if (lineCache.size > 20_000) lineCache.clear()
+        return lineCache.getOrPut(line) { Highlighter.highlightLine(line, inactive) }
     }
-}
 
-class MarkupTransformation(private val colors: MarkupColors) : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText =
-        TransformedText(highlightMarkup(text.text, colors), OffsetMapping.Identity)
+    override fun filter(text: AnnotatedString): TransformedText {
+        val styled = AnnotatedString.Builder(text.text)
+        for (span in Highlighter.highlight(text.text, itemClass, ::cachedLine)) {
+            styled.addStyle(styles.getValue(span.kind), span.start, span.end)
+        }
+        return TransformedText(styled.toAnnotatedString(), OffsetMapping.Identity)
+    }
 
-    override fun equals(other: Any?) = other is MarkupTransformation && other.colors == colors
+    override fun equals(other: Any?) =
+        other is MarkupTransformation && other.colors == colors && other.itemClass == itemClass
 
-    override fun hashCode() = colors.hashCode()
+    override fun hashCode() = 31 * colors.hashCode() + itemClass.hashCode()
 }
