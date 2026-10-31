@@ -1,5 +1,7 @@
 package app.tinynovelwriter.data
 
+import app.tinynovelwriter.UiText
+import app.tinynovelwriter.R
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -10,8 +12,7 @@ import android.net.Uri
  * Starts a FolderSync sync through one of its automation deep links. FolderSync 4.x has
  * no broadcast for this; instead each install has its own links, shown on a folderpair's
  * Automation tab once automation is enabled in FolderSync's settings. The user pastes
- * the folderpair's "Sync" link into the app. There is no way to learn whether the sync
- * succeeded.
+ * the folderpair's "Sync" link into the app. Sync status (success/fail) is received via webhooks.
  */
 object FolderSync {
 
@@ -20,10 +21,10 @@ object FolderSync {
 
     fun isValidLink(link: String): Boolean = LINK.matches(link.trim())
 
-    /** Returns null on success, or a message saying why the sync couldn't be started. */
-    fun startSync(context: Context, link: String): String? {
-        if (!isValidLink(link)) return "The FolderSync link isn't set up (Settings)."
-        val pkg = PACKAGES.firstOrNull { isInstalled(context, it) } ?: return "FolderSync isn't installed."
+    /** Returns null on success, or why the sync couldn't be started. */
+    fun startSync(context: Context, link: String): UiText? {
+        if (!isValidLink(link)) return UiText.of(R.string.sync_link_missing)
+        val pkg = PACKAGES.firstOrNull { isInstalled(context, it) } ?: return UiText.of(R.string.sync_not_installed)
         // Pinned to FolderSync, so the https link never opens in a browser. In a separate,
         // throwaway task: FolderSync's trigger screen sends its task to the back when done,
         // which would otherwise take this app to the home screen, or (in FolderSync's main
@@ -40,7 +41,7 @@ object FolderSync {
             context.startActivity(intent)
             null
         } catch (e: ActivityNotFoundException) {
-            "FolderSync didn't accept the link."
+            UiText.of(R.string.sync_link_rejected)
         }
     }
 

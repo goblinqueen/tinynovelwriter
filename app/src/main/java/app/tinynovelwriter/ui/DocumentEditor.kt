@@ -1,5 +1,7 @@
 package app.tinynovelwriter.ui
 
+import app.tinynovelwriter.UiText
+import app.tinynovelwriter.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -20,11 +22,11 @@ sealed interface EditorStatus {
     /** Nothing to save, or the last save succeeded. */
     data object Idle : EditorStatus
     data object Saving : EditorStatus
-    data class Failed(val message: String) : EditorStatus
+    data class Failed(val message: UiText) : EditorStatus
     /** The file changed on disk under unsaved edits; the user picks a side. */
     data class Conflict(val onDisk: OpenedDocument) : EditorStatus
     /** The document couldn't be opened, or has no file on disk. */
-    data class Unavailable(val message: String) : EditorStatus
+    data class Unavailable(val message: UiText) : EditorStatus
 }
 
 /**
@@ -71,13 +73,13 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
             onSuccess = { doc ->
                 if (doc == null) {
                     opened = null
-                    status = EditorStatus.Unavailable("This document has no file on disk.")
+                    status = EditorStatus.Unavailable(UiText.of(R.string.document_no_file))
                 } else {
                     if (doc.stamp != opened?.stamp) show(doc)
                     status = EditorStatus.Idle
                 }
             },
-            onFailure = { status = EditorStatus.Unavailable(it.message ?: it.toString()) },
+            onFailure = { status = EditorStatus.Unavailable(UiText.of(it)) },
         )
     }
 
@@ -103,10 +105,10 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
                         status = EditorStatus.Idle
                     }
                     is SaveResult.ChangedOnDisk -> status = EditorStatus.Conflict(saved.onDisk)
-                    SaveResult.Missing -> status = EditorStatus.Failed("The file is gone from disk, so it wasn't saved.")
+                    SaveResult.Missing -> status = EditorStatus.Failed(UiText.of(R.string.save_failed_file_gone))
                 }
             },
-            onFailure = { status = EditorStatus.Failed(it.message ?: it.toString()) },
+            onFailure = { status = EditorStatus.Failed(UiText.of(it)) },
         )
         !dirty && status == EditorStatus.Idle
     } }

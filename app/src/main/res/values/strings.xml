@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Every text the app shows. %1$s etc. are filled in by the code. -->
+<resources>
+    <string name="app_name">TinyNovelWriter</string>
+
+    <!-- Permission screen -->
+    <string name="access_explanation">TinyNovelWriter needs All files access to read the synced novelWriter project folder.</string>
+    <string name="access_open_settings">Open settings</string>
+
+    <!-- Common -->
+    <string name="loading">Loading…</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Project tree -->
+    <string name="settings">Settings</string>
+    <string name="unnamed_project">(unnamed project)</string>
+    <string name="unnamed_item">(unnamed)</string>
+    <plurals name="note_count">
+        <item quantity="one">%1$d note</item>
+        <item quantity="other">%1$d notes</item>
+    </plurals>
+    <string name="project_load_failed">%1$s\n\nFolder: %2$s</string>
+    <string name="not_a_project">No nwProject.nwx in %1$s</string>
+    <!-- %1$s: the PC's name from the lock file -->
+    <string name="lock_open_on">Open in novelWriter on %1$s</string>
+    <string name="lock_unknown_host">the PC</string>
+
+    <!-- Settings dialog -->
+    <string name="settings_project_folder">Project folder</string>
+    <string name="settings_sync_link">FolderSync sync link</string>
+    <string name="settings_sync_link_help">In FolderSync: Settings → enable automation, then the folderpair\'s Automation tab → copy the Sync link. Leave empty to not sync from here.</string>
+
+    <!-- Sync button and results -->
+    <string name="sync">Sync</string>
+    <string name="sync_running">Syncing…</string>
+    <string name="sync_done">Success</string>
+    <string name="sync_failed">Sync failed</string>
+    <string name="sync_cancelled">Sync cancelled</string>
+    <string name="sync_no_response">FolderSync hasn\'t responded</string>
+    <string name="sync_link_missing">The FolderSync link isn\'t set up (Settings).</string>
+    <string name="sync_not_installed">FolderSync isn\'t installed.</string>
+    <string name="sync_link_rejected">FolderSync hasn\'t accepted the link.</string>
+
+    <!-- Document screen -->
+    <string name="edit">Edit</string>
+    <string name="done">Done</string>
+    <string name="document_empty">This document is empty.</string>
+    <string name="document_no_file">This document has no file on disk.</string>
+    <string name="conflict_message">This document changed on disk (probably synced from the PC) while you had unsaved edits.</string>
+    <string name="conflict_reload_theirs">Reload theirs</string>
+    <string name="conflict_keep_mine">Keep mine</string>
+    <!-- %1$s: why the save failed -->
+    <string name="save_failed">Not saved: %1$s</string>
+    <string name="save_failed_file_gone">The file is gone from disk, so it wasn\'t saved.</string>
+    <string name="retry">Retry</string>
+    <string name="leave_unsaved_title">Changes not saved</string>
+    <string name="leave_unsaved_message">Your latest edits couldn\'t be saved. Leave anyway and lose them?</string>
+    <string name="leave">Leave</string>
+    <string name="stay">Stay</string>
+</resources>

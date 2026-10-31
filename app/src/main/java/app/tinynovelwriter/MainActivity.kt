@@ -1,5 +1,7 @@
 package app.tinynovelwriter
 
+import app.tinynovelwriter.data.NotAProjectException
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -34,11 +36,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.tinynovelwriter.data.DEFAULT_PROJECT_PATH
 import app.tinynovelwriter.data.FolderSync
-import app.tinynovelwriter.data.PrefsSyncStore
+import app.tinynovelwriter.data.SyncHub
 import app.tinynovelwriter.data.ProjectFolder
 import app.tinynovelwriter.data.SyncStatus
 import app.tinynovelwriter.data.SyncTracker
-import app.tinynovelwriter.data.WebhookListener
 import app.tinynovelwriter.format.HeaderItem
 import app.tinynovelwriter.format.ItemType
 import app.tinynovelwriter.ui.DocumentScreen
@@ -71,13 +72,14 @@ class MainActivity : ComponentActivity() {
     /** Bumped whenever the sync tracker changes, so Compose re-reads it. */
     private var syncVersion by mutableIntStateOf(0)
     private lateinit var syncTracker: SyncTracker
+    private val onSyncChange: () -> Unit = { syncVersion++ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        syncTracker = SyncTracker(PrefsSyncStore(prefs)).apply { onChange = { syncVersion++ } }
-        WebhookListener.start { event -> runOnUiThread { syncTracker.onWebhook(event) } }
+        syncTracker = SyncHub.get(this)
+        SyncHub.addListener(onSyncChange)
         setContent {
             TinyTheme {
                 if (hasAccess) {
@@ -96,6 +98,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        SyncHub.removeListener(onSyncChange)
+        super.onDestroy()
     }
 
     override fun onResume() {
@@ -139,7 +146,7 @@ private fun App(
     val sync: () -> Unit = {
         if (syncLink.isNotBlank()) {
             val error = FolderSync.startSync(context, syncLink)
-            if (error == null) syncTracker.noteSyncRequested() else Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+            if (error == null) syncTracker.noteSyncRequested() else Toast.makeText(context, error.resolve(context), Toast.LENGTH_LONG).show()
         }
     }
     // Report "no response" if FolderSync's webhooks don't come in time.
@@ -160,7 +167,9 @@ private fun App(
             try {
                 ProjectState.Loaded(folder.load())
             } catch (e: Exception) {
-                ProjectState.Failed(e.message ?: e.toString())
+                ProjectState.Failed(
+                    if (e is NotAProjectException) UiText.of(R.string.not_a_project, e.path) else UiText.of(e)
+                )
             }
         }
         refreshing = false
@@ -229,8 +238,8 @@ private fun AccessScreen(onGrant: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("TinyNovelWriter needs All files access to read the synced novelWriter project folder.")
-            Button(onClick = onGrant) { Text("Open settings") }
+            Text(stringResource(R.string.access_explanation))
+            Button(onClick = onGrant) { Text(stringResource(R.string.access_open_settings)) }
         }
     }
 }

@@ -1,5 +1,10 @@
 package app.tinynovelwriter.ui
 
+import app.tinynovelwriter.resolve
+import app.tinynovelwriter.UiText
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -57,7 +62,7 @@ import app.tinynovelwriter.format.ProjectNode
 sealed interface ProjectState {
     data object Loading : ProjectState
     data class Loaded(val loaded: LoadedProject) : ProjectState
-    data class Failed(val message: String) : ProjectState
+    data class Failed(val message: UiText) : ProjectState
 }
 
 private data class TreeRow(val node: ProjectNode, val depth: Int)
@@ -87,7 +92,7 @@ fun ProjectScreen(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = { editingSettings = true }) {
-                        Icon(painterResource(R.drawable.ic_settings), contentDescription = "Settings")
+                        Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.settings))
                     }
                 },
                 actions = {
@@ -98,8 +103,8 @@ fun ProjectScreen(
     ) { padding ->
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = Modifier.padding(padding)) {
             when (state) {
-                ProjectState.Loading -> Message("Loading…")
-                is ProjectState.Failed -> Message("${state.message}\n\nFolder: $projectPath")
+                ProjectState.Loading -> Message(stringResource(R.string.loading))
+                is ProjectState.Failed -> Message(stringResource(R.string.project_load_failed, state.message.resolve(), projectPath))
                 is ProjectState.Loaded -> ProjectTree(state.loaded, syncStatus, listState, toggled, onToggle, onOpenDocument)
             }
         }
@@ -111,20 +116,17 @@ fun ProjectScreen(
         val linkOk = link.isBlank() || FolderSync.isValidLink(link)
         AlertDialog(
             onDismissRequest = { editingSettings = false },
-            title = { Text("Settings") },
+            title = { Text(stringResource(R.string.settings)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(value = path, onValueChange = { path = it }, label = { Text("Project folder") })
+                    OutlinedTextField(value = path, onValueChange = { path = it }, label = { Text(stringResource(R.string.settings_project_folder)) })
                     OutlinedTextField(
                         value = link,
                         onValueChange = { link = it },
-                        label = { Text("FolderSync sync link") },
+                        label = { Text(stringResource(R.string.settings_sync_link)) },
                         isError = !linkOk,
                         supportingText = {
-                            Text(
-                                "In FolderSync: Settings → enable automation, then the folderpair's " +
-                                    "Automation tab → copy the Sync link. Leave empty to not sync from here."
-                            )
+                            Text(stringResource(R.string.settings_sync_link_help))
                         },
                     )
                 }
@@ -133,9 +135,9 @@ fun ProjectScreen(
                 TextButton(enabled = linkOk, onClick = {
                     editingSettings = false
                     onChangeSettings(path.trim(), link.trim())
-                }) { Text("Save") }
+                }) { Text(stringResource(R.string.save)) }
             },
-            dismissButton = { TextButton(onClick = { editingSettings = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { editingSettings = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -168,7 +170,7 @@ private fun ProjectTree(
             // The project name heads the table of contents; it wraps and scrolls with it.
             item(key = "project-name") {
                 Text(
-                    loaded.project.name.ifEmpty { "(unnamed project)" },
+                    loaded.project.name.ifEmpty { stringResource(R.string.unnamed_project) },
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                 )
@@ -201,11 +203,12 @@ private fun flatten(nodes: List<ProjectNode>, isCollapsed: (ProjectNode) -> Bool
         listOf(TreeRow(node, depth)) + children
     }
 
-/** Placeholder wording; the user will supply the final texts. */
+/** Wording is in strings.xml. */
+@StringRes
 private fun syncFailureText(kind: String) = when (kind) {
-    "noresponse" -> "FolderSync didn't respond"
-    "cancelled" -> "Last sync cancelled"
-    else -> "Last sync failed"
+    "noresponse" -> R.string.sync_no_response
+    "cancelled" -> R.string.sync_cancelled
+    else -> R.string.sync_failed
 }
 
 /** Only shown when something needs attention: a lock file, or the last sync failed. */
@@ -219,8 +222,8 @@ private fun StatusCard(loaded: LoadedProject, sync: SyncStatus) {
         modifier = Modifier.fillMaxWidth().padding(12.dp),
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            if (lock != null) Text("Open in novelWriter on ${lock.host.ifEmpty { "the PC" }}", style = MaterialTheme.typography.bodyMedium)
-            if (failed != null) Text(syncFailureText(failed.kind), style = MaterialTheme.typography.bodyMedium)
+            if (lock != null) Text(stringResource(R.string.lock_open_on, lock.host.ifEmpty { stringResource(R.string.lock_unknown_host) }), style = MaterialTheme.typography.bodyMedium)
+            if (failed != null) Text(stringResource(syncFailureText(failed.kind)), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -244,11 +247,11 @@ private fun SyncButton(sync: SyncStatus, onSync: () -> Unit) {
     val waiting = sync.state is SyncState.Waiting || sync.state is SyncState.Running
     TextButton(onClick = onSync, enabled = !waiting) {
         when {
-            waiting -> Text("Syncing…")
-            justSynced -> Text("Synced", color = if (isSystemInDarkTheme()) Color(0xFF8FD19E) else Color(0xFF1E7A34))
+            waiting -> Text(stringResource(R.string.sync_running))
+            justSynced -> Text(stringResource(R.string.sync_done), color = TinyColors.syncSuccess)
             else -> {
                 if (sync.unsynced) Text("● ", color = MaterialTheme.colorScheme.error)
-                Text("Sync")
+                Text(stringResource(R.string.sync))
             }
         }
     }
@@ -275,7 +278,7 @@ private fun TreeRowView(row: TreeRow, isCollapsed: Boolean, summary: FolderSumma
         }
         Text(marker, modifier = Modifier.width(20.dp))
         Text(
-            item.name.ifEmpty { "(unnamed)" },
+            item.name.ifEmpty { stringResource(R.string.unnamed_item) },
             fontWeight = if (item.type == ItemType.ROOT) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -284,7 +287,7 @@ private fun TreeRowView(row: TreeRow, isCollapsed: Boolean, summary: FolderSumma
         val count = when {
             isFile -> "${item.wordCount}"
             summary is FolderSummary.Words -> "${summary.words}"
-            summary is FolderSummary.Notes -> if (summary.notes == 1) "1 note" else "${summary.notes} notes"
+            summary is FolderSummary.Notes -> pluralStringResource(R.plurals.note_count, summary.notes, summary.notes)
             else -> null
         }
         if (count != null) {

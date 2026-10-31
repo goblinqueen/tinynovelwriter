@@ -1,5 +1,8 @@
 package app.tinynovelwriter.ui
 
+import app.tinynovelwriter.resolve
+import app.tinynovelwriter.R
+import androidx.compose.ui.res.stringResource
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -87,7 +90,7 @@ fun DocumentScreen(
                             } else {
                                 editor.editing = true
                             }
-                        }) { Text(if (editor.editing) "Done" else "Edit") }
+                        }) { Text(stringResource(if (editor.editing) R.string.done else R.string.edit)) }
                     }
                 },
             )
@@ -96,15 +99,15 @@ fun DocumentScreen(
         Column(Modifier.padding(padding).imePadding()) {
             if (status is EditorStatus.Conflict) {
                 Banner(
-                    "This document changed on disk (probably synced from the PC) while you had unsaved edits.",
+                    stringResource(R.string.conflict_message),
                     MaterialTheme.colorScheme.errorContainer,
                 ) {
-                    TextButton(onClick = { scope.launch { editor.takeTheirs() } }) { Text("Reload theirs") }
-                    TextButton(onClick = { scope.launch { editor.keepMine() } }) { Text("Keep mine") }
+                    TextButton(onClick = { scope.launch { editor.takeTheirs() } }) { Text(stringResource(R.string.conflict_reload_theirs)) }
+                    TextButton(onClick = { scope.launch { editor.keepMine() } }) { Text(stringResource(R.string.conflict_keep_mine)) }
                 }
             } else if (status is EditorStatus.Failed) {
-                Banner("Not saved: ${status.message}", MaterialTheme.colorScheme.errorContainer) {
-                    TextButton(onClick = { scope.launch { editor.save() } }) { Text("Retry") }
+                Banner(stringResource(R.string.save_failed, status.message.resolve()), MaterialTheme.colorScheme.errorContainer) {
+                    TextButton(onClick = { scope.launch { editor.save() } }) { Text(stringResource(R.string.retry)) }
                 }
             }
 
@@ -115,10 +118,10 @@ fun DocumentScreen(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 when (status) {
-                    EditorStatus.Loading -> Message("Loading…")
-                    is EditorStatus.Unavailable -> Message(status.message)
+                    EditorStatus.Loading -> Message(stringResource(R.string.loading))
+                    is EditorStatus.Unavailable -> Message(status.message.resolve())
                     else ->
-                        if (text.isBlank() && !editor.editing) Message("This document is empty.")
+                        if (text.isBlank() && !editor.editing) Message(stringResource(R.string.document_empty))
                         else DocumentText(editor.value, editor::onValueChange, readOnly = !editor.editing)
                 }
             }
@@ -128,10 +131,10 @@ fun DocumentScreen(
     if (askLeave) {
         AlertDialog(
             onDismissRequest = { askLeave = false },
-            title = { Text("Changes not saved") },
-            text = { Text("Your latest edits couldn't be saved. Leave anyway and lose them?") },
-            confirmButton = { TextButton(onClick = { askLeave = false; onLeave() }) { Text("Leave") } },
-            dismissButton = { TextButton(onClick = { askLeave = false }) { Text("Stay") } },
+            title = { Text(stringResource(R.string.leave_unsaved_title)) },
+            text = { Text(stringResource(R.string.leave_unsaved_message)) },
+            confirmButton = { TextButton(onClick = { askLeave = false; onLeave() }) { Text(stringResource(R.string.leave)) } },
+            dismissButton = { TextButton(onClick = { askLeave = false }) { Text(stringResource(R.string.stay)) } },
         )
     }
 }

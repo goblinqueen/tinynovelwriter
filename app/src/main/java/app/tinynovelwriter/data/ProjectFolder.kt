@@ -27,6 +27,9 @@ data class LoadedProject(
     val lock: LockInfo?,
 )
 
+/** The chosen folder has no `nwProject.nwx`. */
+class NotAProjectException(val path: String) : Exception("No $PROJECT_FILE in $path")
+
 /** A file's modification time and size, used to notice changes cheaply. */
 data class FileStamp(val modified: Long, val size: Long) {
     companion object {
@@ -53,7 +56,7 @@ class ProjectFolder(val root: File) {
     /** @throws Exception with a user-readable message when the folder isn't a usable project. */
     fun load(): LoadedProject {
         val projectFile = File(root, PROJECT_FILE)
-        if (!projectFile.isFile) throw IllegalStateException("No $PROJECT_FILE in ${root.path}")
+        if (!projectFile.isFile) throw NotAProjectException(root.path)
 
         val project = projectFile.inputStream().use(ProjectXml::parse)
         val lockFile = File(root, LockFile.NAME)
