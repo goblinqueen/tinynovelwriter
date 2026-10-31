@@ -7,6 +7,15 @@
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <!-- EXPERIMENT: local listener for FolderSync webhooks (sockets need INTERNET, even on localhost). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- FolderSync, so sync links can be sent to it (Android 11 package visibility). -->
+    <queries>
+        <package android:name="dk.tacit.android.foldersync.full" />
+        <package android:name="dk.tacit.android.foldersync.lite" />
+    </queries>
+
     <application
         android:label="TinyNovelWriter"
         android:theme="@style/Theme.Tiny">

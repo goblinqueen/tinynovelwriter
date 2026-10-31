@@ -1,5 +1,6 @@
 package app.tinynovelwriter.ui
 
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,13 +30,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.tinynovelwriter.format.Counting
-import app.tinynovelwriter.format.LockInfo
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,7 +48,6 @@ import kotlinx.coroutines.launch
 fun DocumentScreen(
     title: String,
     editor: DocumentEditor,
-    lock: LockInfo?,
     onLeave: () -> Unit,
     refreshing: Boolean,
     onRefresh: () -> Unit,
@@ -55,7 +60,9 @@ fun DocumentScreen(
 
     // Leaving saves first; if that fails, ask instead of losing edits.
     val leave: () -> Unit = {
-        scope.launch { if (editor.save()) onLeave() else askLeave = true }
+        scope.launch {
+            if (editor.save()) onLeave() else askLeave = true
+        }
     }
 
     BackHandler(onBack = leave)
@@ -64,9 +71,7 @@ fun DocumentScreen(
         topBar = {
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { TextButton(onClick = leave) { Text("‹ Back") } },
                 actions = {
-                    if (editor.editing) SaveStatus(editor)
                     if (status !is EditorStatus.Loading && status !is EditorStatus.Unavailable) {
                         Text(
                             "$words",
@@ -101,12 +106,6 @@ fun DocumentScreen(
                 Banner("Not saved: ${status.message}", MaterialTheme.colorScheme.errorContainer) {
                     TextButton(onClick = { scope.launch { editor.save() } }) { Text("Retry") }
                 }
-            } else if (editor.editing && lock != null) {
-                Banner(
-                    "novelWriter had this project open on ${lock.host.ifEmpty { "the PC" }} at the last sync. " +
-                        "Close it there before editing here.",
-                    MaterialTheme.colorScheme.secondaryContainer,
-                )
             }
 
             // Refresh never replaces unsaved edits (see DocumentEditor.reloadIfClean).
@@ -138,17 +137,6 @@ fun DocumentScreen(
 }
 
 @Composable
-private fun SaveStatus(editor: DocumentEditor) {
-    val label = when {
-        editor.status is EditorStatus.Saving -> "Saving…"
-        editor.status is EditorStatus.Failed || editor.status is EditorStatus.Conflict -> "Not saved"
-        editor.dirty -> "Edited"
-        else -> "Saved"
-    }
-    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-@Composable
 private fun Banner(message: String, color: Color, actions: @Composable () -> Unit = {}) {
     Surface(color = color, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp)) {
@@ -164,6 +152,22 @@ private fun DocumentText(value: TextFieldValue, onValueChange: (TextFieldValue) 
     val colors = MaterialTheme.colorScheme
     val markup = remember(colors) { MarkupTransformation(MarkupColors(colors.primary, colors.outline)) }
     val scroll = rememberScrollState()
+    // Tapping Edit leaves focus on the button, so a hardware keyboard's arrow keys would
+    // move between buttons. Put focus in the text when editing starts.
+    val focus = remember { FocusRequester() }
+    // Focusing the field pops up the on-screen keyboard even when a hardware keyboard is
+    // connected (Android only hides it once typing starts), so hide it right away then.
+    val softKeyboard = LocalSoftwareKeyboardController.current
+    val config = LocalConfiguration.current
+    val hasHardwareKeyboard = config.keyboard == Configuration.KEYBOARD_QWERTY &&
+        config.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
+    LaunchedEffect(readOnly) {
+        if (!readOnly) {
+            focus.requestFocus()
+            if (hasHardwareKeyboard) softKeyboard?.hide()
+        }
+    }
+    val vertical = remember { VerticalArrows() }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
             BasicTextField(
@@ -173,8 +177,21 @@ private fun DocumentText(value: TextFieldValue, onValueChange: (TextFieldValue) 
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
                 cursorBrush = SolidColor(colors.primary),
                 visualTransformation = markup,
+                onTextLayout = { vertical.layout = it },
                 // Extra end padding keeps text clear of the scrollbar.
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focus)
+                    .onPreviewKeyEvent { event ->
+                        if (readOnly) return@onPreviewKeyEvent false
+                        val moved = lineEdgeKey(event, value, vertical.layout)
+                            ?: horizontalArrow(event, value)
+                            ?: vertical.handle(event, value)
+                            ?: return@onPreviewKeyEvent false
+                        if (moved != value) onValueChange(moved)
+                        true
+                    }
+                    .padding(start = 16.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
             )
         }
         VerticalScrollbar(scroll, Modifier.align(Alignment.CenterEnd))

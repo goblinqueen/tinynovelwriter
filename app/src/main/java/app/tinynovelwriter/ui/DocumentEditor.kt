@@ -46,6 +46,8 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
     /** Text as last loaded or saved; differs from [value] when there are unsaved edits. */
     private var savedText by mutableStateOf("")
     private val mutex = Mutex()
+    /** Called after every successful write, e.g. to remember that a sync is due. */
+    var onWritten: () -> Unit = {}
 
     val dirty: Boolean get() = value.text != savedText
     val canEdit: Boolean get() = opened != null && item != null
@@ -97,6 +99,7 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
                     is SaveResult.Saved -> {
                         opened = saved.opened
                         savedText = text
+                        onWritten()
                         status = EditorStatus.Idle
                     }
                     is SaveResult.ChangedOnDisk -> status = EditorStatus.Conflict(saved.onDisk)

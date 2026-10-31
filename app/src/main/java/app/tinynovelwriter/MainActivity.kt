@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -29,9 +30,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.tinynovelwriter.data.DEFAULT_PROJECT_PATH
+import app.tinynovelwriter.data.FolderSync
+import app.tinynovelwriter.data.PrefsSyncStore
 import app.tinynovelwriter.data.ProjectFolder
+import app.tinynovelwriter.data.SyncState
+import app.tinynovelwriter.data.SyncStatus
+import app.tinynovelwriter.data.SyncTracker
+import app.tinynovelwriter.data.WebhookListener
 import app.tinynovelwriter.format.HeaderItem
 import app.tinynovelwriter.format.ItemType
 import app.tinynovelwriter.ui.DocumentScreen
@@ -48,6 +56,7 @@ import kotlinx.coroutines.withContext
 
 private const val PREFS = "settings"
 private const val KEY_PROJECT_PATH = "projectPath"
+private const val KEY_SYNC_LINK = "folderSyncLink"
 private const val AUTOSAVE_DELAY_MS = 2000L
 
 class MainActivity : ComponentActivity() {
@@ -60,16 +69,26 @@ class MainActivity : ComponentActivity() {
     /** Bumped on every pause so an open document saves before the app goes to the background. */
     private var pauseCount by mutableIntStateOf(0)
 
+    /** Bumped whenever the sync tracker changes, so Compose re-reads it. */
+    private var syncVersion by mutableIntStateOf(0)
+    private lateinit var syncTracker: SyncTracker
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        syncTracker = SyncTracker(PrefsSyncStore(prefs)).apply { onChange = { syncVersion++ } }
+        WebhookListener.start { event -> runOnUiThread { syncTracker.onWebhook(event) } }
         setContent {
             TinyTheme {
                 if (hasAccess) {
                     App(
                         initialPath = prefs.getString(KEY_PROJECT_PATH, null) ?: DEFAULT_PROJECT_PATH,
                         savePath = { prefs.edit().putString(KEY_PROJECT_PATH, it).apply() },
+                        initialSyncLink = prefs.getString(KEY_SYNC_LINK, null).orEmpty(),
+                        saveSyncLink = { prefs.edit().putString(KEY_SYNC_LINK, it).apply() },
+                        syncTracker = syncTracker,
+                        syncVersion = syncVersion,
                         resumeCount = resumeCount,
                         pauseCount = pauseCount,
                     )
@@ -99,13 +118,39 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun App(initialPath: String, savePath: (String) -> Unit, resumeCount: Int, pauseCount: Int) {
+private fun App(
+    initialPath: String,
+    savePath: (String) -> Unit,
+    initialSyncLink: String,
+    saveSyncLink: (String) -> Unit,
+    syncTracker: SyncTracker,
+    /** Changes whenever [syncTracker] does; read so that its state is observed. */
+    syncVersion: Int,
+    resumeCount: Int,
+    pauseCount: Int,
+) {
     var path by rememberSaveable { mutableStateOf(initialPath) }
     var openHandle by rememberSaveable { mutableStateOf<String?>(null) }
     // Tree view state lives here so it survives opening a document; reset when the folder changes.
     val treeListState = rememberSaveable(path, saver = LazyListState.Saver) { LazyListState() }
-    var collapsed by rememberSaveable(path) { mutableStateOf(setOf<String>()) }
+    var toggled by rememberSaveable(path) { mutableStateOf(setOf<String>()) }
     val folder = ProjectFolder(File(path))
+    var syncLink by rememberSaveable { mutableStateOf(initialSyncLink) }
+    val context = LocalContext.current
+    val sync: () -> Unit = {
+        if (syncLink.isNotBlank()) {
+            val error = FolderSync.startSync(context, syncLink)
+            if (error == null) syncTracker.noteSyncRequested() else Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+        }
+    }
+    // Stop waiting if FolderSync's webhook never comes (e.g. the app was frozen meanwhile).
+    LaunchedEffect(syncVersion, resumeCount) {
+        if (syncTracker.state is SyncState.Waiting) {
+            delay(SyncTracker.WAIT_MS)
+            syncTracker.expireWaiting()
+        }
+    }
+    val syncStatus = remember(syncVersion) { SyncStatus(syncTracker.state, syncTracker.unsynced) }
     // Swipe-to-refresh: bumping refreshCount re-reads the project and the open document.
     var refreshCount by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
@@ -128,9 +173,17 @@ private fun App(initialPath: String, savePath: (String) -> Unit, resumeCount: In
             state = projectState,
             projectPath = path,
             listState = treeListState,
-            collapsed = collapsed,
-            onToggle = { collapsed = if (it in collapsed) collapsed - it else collapsed + it },
-            onChangePath = { path = it; savePath(it) },
+            toggled = toggled,
+            onToggle = { toggled = if (it in toggled) toggled - it else toggled + it },
+            syncLink = syncLink,
+            syncStatus = syncStatus,
+            onChangeSettings = { newPath, newLink ->
+                path = newPath
+                savePath(newPath)
+                syncLink = newLink
+                saveSyncLink(newLink)
+            },
+            onSync = sync,
             onOpenDocument = { openHandle = it },
             refreshing = refreshing,
             onRefresh = onRefresh,
@@ -139,7 +192,10 @@ private fun App(initialPath: String, savePath: (String) -> Unit, resumeCount: In
         val loaded = (projectState as? ProjectState.Loaded)?.loaded
         val item = loaded?.project?.items?.get(handle)?.takeIf { it.type == ItemType.FILE }
         val editor = remember(path, handle) { DocumentEditor(folder, handle) }
-        SideEffect { editor.item = item?.let(HeaderItem::of) }
+        SideEffect {
+            editor.item = item?.let(HeaderItem::of)
+            editor.onWritten = { syncTracker.noteWrite() }
+        }
 
         // Load, and pick up synced changes on resume or refresh (skipped while there are unsaved edits).
         LaunchedEffect(editor, resumeCount, refreshCount) {
@@ -159,7 +215,6 @@ private fun App(initialPath: String, savePath: (String) -> Unit, resumeCount: In
         DocumentScreen(
             title = item?.name ?: "",
             editor = editor,
-            lock = loaded?.lock,
             onLeave = { openHandle = null },
             refreshing = refreshing,
             onRefresh = onRefresh,

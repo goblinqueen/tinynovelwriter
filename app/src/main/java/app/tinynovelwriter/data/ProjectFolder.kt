@@ -19,13 +19,12 @@ import java.time.LocalDateTime
 const val DEFAULT_PROJECT_PATH = "/storage/emulated/0/Documents/NovelWriter"
 
 private const val PROJECT_FILE = "nwProject.nwx"
+private const val INDEX_FILE = "index.json"
 
 data class LoadedProject(
     val project: NwProject,
     /** Null when there is no lock file, i.e. novelWriter wasn't open at the last sync. */
     val lock: LockInfo?,
-    /** Newest modification time (ms) of the project file and documents. */
-    val lastChanged: Long,
 )
 
 /** A file's modification time and size, used to notice changes cheaply. */
@@ -59,10 +58,7 @@ class ProjectFolder(val root: File) {
         val project = projectFile.inputStream().use(ProjectXml::parse)
         val lockFile = File(root, LockFile.NAME)
         val lock = if (lockFile.isFile) LockFile.parse(lockFile.readText()) else null
-        val documents = contentDir.listFiles { f -> f.extension == "md" && isHandle(f.nameWithoutExtension) }.orEmpty()
-        val lastChanged = (documents.map { it.lastModified() } + projectFile.lastModified()).max()
-
-        return LoadedProject(project, lock, lastChanged)
+        return LoadedProject(project, lock)
     }
 
     /** Returns null when the document has no file on disk (novelWriter treats it as empty). */
@@ -101,17 +97,16 @@ class ProjectFolder(val root: File) {
         }
 
         val rendered = DocumentWriter.render(text, item, previous.document, formatTimestamp(now))
-        val temp = File(contentDir, "${opened.handle}.tmp")
-        try {
-            FileOutputStream(temp).use { out ->
-                out.write(rendered.bytes)
-                out.fd.sync() // on disk before the rename, so a crash can't leave a short file
-            }
-            Files.move(temp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        } catch (e: Exception) {
-            temp.delete()
-            throw e
+        writeAtomically(file, File(contentDir, "${opened.handle}.tmp"), rendered.bytes)
+
+        // A copy of the phone's version, in case the PC later overwrites the document
+        // (novelWriter open there with stale text). One per document, replaced each save.
+        // novelWriter only picks up `<handle>.md` files, so it ignores these. Best effort.
+        runCatching {
+            writeAtomically(File(contentDir, "${opened.handle}.md.bkp"), File(contentDir, "${opened.handle}.bkp.tmp"), rendered.bytes)
         }
+
+        retireIndex()
 
         val saved = NwDocument(
             meta = rendered.meta,
@@ -121,6 +116,40 @@ class ProjectFolder(val root: File) {
             lineEnding = previous.document.lineEnding,
         )
         return SaveResult.Saved(OpenedDocument(opened.handle, saved, FileStamp.of(file)))
+    }
+
+    /** Write [bytes] to [temp], flush it to disk, then rename it over [target] in one step. */
+    private fun writeAtomically(target: File, temp: File, bytes: ByteArray) {
+        try {
+            FileOutputStream(temp).use { out ->
+                out.write(bytes)
+                out.fd.sync() // on disk before the rename, so a crash can't leave a short file
+            }
+            Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } catch (e: Exception) {
+            temp.delete()
+            throw e
+        }
+    }
+
+    /**
+     * After a phone edit novelWriter's index is stale, and it only re-indexes documents
+     * missing from it. Without `meta/index.json` its revision no longer matches the
+     * project file, so novelWriter rebuilds the whole index on the next open (with a
+     * "Rebuilding index" message). The old index is kept as `index.json.old`, replacing
+     * the previous one. Best effort: a failure here doesn't undo the save.
+     */
+    private fun retireIndex() {
+        val index = File(root, "meta/$INDEX_FILE")
+        if (!index.exists()) return
+        runCatching {
+            Files.move(
+                index.toPath(),
+                File(root, "meta/$INDEX_FILE.old").toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        }
     }
 
     private fun documentFile(handle: String): File {

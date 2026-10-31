@@ -4,6 +4,7 @@ import app.tinynovelwriter.format.DocumentReader
 import app.tinynovelwriter.format.HeaderItem
 import app.tinynovelwriter.format.ItemClass
 import app.tinynovelwriter.format.ItemLayout
+import app.tinynovelwriter.format.isHandle
 import java.io.File
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
@@ -55,12 +56,28 @@ class ProjectFolderSaveTest {
         val result = folder.saveDocument(opened, "New text.\n", item, now = now)
 
         assertTrue(result is SaveResult.Saved)
-        assertEquals(listOf("$handle.md"), contentFiles())
+        assertEquals(listOf("$handle.md", "$handle.md.bkp"), contentFiles())
         val onDisk = DocumentReader.parse(file.readBytes())
         assertEquals("New text.\n", onDisk.text)
         assertEquals("2026-10-31 12:00:00", onDisk.meta.updatedDate)
         assertEquals("2026-10-29 22:58:19", onDisk.meta.createdDate)
         assertFalse(Regex("(?<!\r)\n").containsMatchIn(file.readText()))
+    }
+
+    @Test
+    fun backupIsACopyOfTheLatestSave() {
+        val first = folder.saveDocument(folder.openDocument(handle)!!, "One.\n", item, now = now) as SaveResult.Saved
+        folder.saveDocument(first.opened, "Two.\n", item, now = now)
+        val backup = File(file.parentFile, "$handle.md.bkp")
+        assertTrue(file.readBytes().contentEquals(backup.readBytes()))
+        assertEquals(listOf("$handle.md", "$handle.md.bkp"), contentFiles())
+    }
+
+    @Test
+    fun backupNameIsIgnoredByNovelWriter() {
+        // novelWriter's scanContent: suffix ".md" and a handle as the stem.
+        val backup = File("$handle.md.bkp")
+        assertFalse(backup.extension == "md" && isHandle(backup.nameWithoutExtension))
     }
 
     @Test
@@ -82,7 +99,7 @@ class ProjectFolderSaveTest {
         assertTrue(result is SaveResult.ChangedOnDisk)
         assertEquals("Edited on the PC.\n", (result as SaveResult.ChangedOnDisk).onDisk.document.text)
         assertTrue(before.contentEquals(file.readBytes()))
-        assertEquals(listOf("$handle.md"), contentFiles())
+        assertEquals(listOf("$handle.md"), contentFiles()) // no backup for a refused save
     }
 
     @Test
@@ -111,10 +128,40 @@ class ProjectFolderSaveTest {
     }
 
     @Test
+    fun saveMovesTheIndexAsideReplacingTheOldCopy() {
+        val meta = File(file.parentFile!!.parentFile, "meta").apply { mkdir() }
+        File(meta, "index.json").writeText("new index")
+        File(meta, "index.json.old").writeText("older index")
+        File(meta, "options.json").writeText("options")
+
+        folder.saveDocument(folder.openDocument(handle)!!, "New.\n", item, now = now)
+
+        assertEquals(listOf("index.json.old", "options.json"), meta.list()!!.sorted())
+        assertEquals("new index", File(meta, "index.json.old").readText())
+    }
+
+    @Test
+    fun refusedSaveLeavesTheIndex() {
+        val meta = File(file.parentFile!!.parentFile, "meta").apply { mkdir() }
+        File(meta, "index.json").writeText("index")
+        val opened = folder.openDocument(handle)!!
+        changeOnDisk("Edited on the PC.")
+
+        folder.saveDocument(opened, "Phone edit.\n", item, now = now)
+
+        assertEquals(listOf("index.json"), meta.list()!!.toList())
+    }
+
+    @Test
+    fun saveWorksWithoutAnIndex() {
+        assertTrue(folder.saveDocument(folder.openDocument(handle)!!, "New.\n", item, now = now) is SaveResult.Saved)
+    }
+
+    @Test
     fun leavesOtherFilesAlone() {
         val other = File(file.parentFile, "aaaaaaaaaaaa1.md").apply { writeText("other") }
         folder.saveDocument(folder.openDocument(handle)!!, "New.\n", item, now = now)
         assertEquals("other", other.readText())
-        assertEquals(listOf("$handle.md", "aaaaaaaaaaaa1.md").sorted(), contentFiles())
+        assertEquals(listOf("$handle.md", "$handle.md.bkp", "aaaaaaaaaaaa1.md").sorted(), contentFiles())
     }
 }

@@ -35,12 +35,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.tinynovelwriter.data.FolderSync
 import app.tinynovelwriter.data.LoadedProject
+import app.tinynovelwriter.data.SyncState
+import app.tinynovelwriter.data.SyncStatus
+import app.tinynovelwriter.format.FolderSummary
+import app.tinynovelwriter.format.ItemClass
 import app.tinynovelwriter.format.ItemType
+import app.tinynovelwriter.format.folderSummary
 import app.tinynovelwriter.format.ProjectNode
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 /** Result of loading the project folder, as shown by [ProjectScreen]. */
 sealed interface ProjectState {
@@ -57,14 +60,18 @@ fun ProjectScreen(
     state: ProjectState,
     projectPath: String,
     listState: LazyListState,
-    collapsed: Set<String>,
+    /** Containers the user expanded or collapsed away from their default state. */
+    toggled: Set<String>,
     onToggle: (handle: String) -> Unit,
-    onChangePath: (String) -> Unit,
+    syncLink: String,
+    syncStatus: SyncStatus,
+    onChangeSettings: (path: String, syncLink: String) -> Unit,
+    onSync: () -> Unit,
     onOpenDocument: (handle: String) -> Unit,
     refreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
-    var editingPath by remember { mutableStateOf(false) }
+    var editingSettings by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -73,7 +80,18 @@ fun ProjectScreen(
                     val title = (state as? ProjectState.Loaded)?.loaded?.project?.name ?: "TinyNovelWriter"
                     Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
-                actions = { TextButton(onClick = { editingPath = true }) { Text("Folder") } },
+                actions = {
+                    if (FolderSync.isValidLink(syncLink)) {
+                        val waiting = syncStatus.state is SyncState.Waiting
+                        TextButton(onClick = onSync, enabled = !waiting) {
+                            if (syncStatus.unsynced && !waiting) {
+                                Text("● ", color = MaterialTheme.colorScheme.error)
+                            }
+                            Text(if (waiting) "Syncing…" else "Sync")
+                        }
+                    }
+                    TextButton(onClick = { editingSettings = true }) { Text("Settings") }
+                },
             )
         },
     ) { padding ->
@@ -81,21 +99,42 @@ fun ProjectScreen(
             when (state) {
                 ProjectState.Loading -> Message("Loading…")
                 is ProjectState.Failed -> Message("${state.message}\n\nFolder: $projectPath")
-                is ProjectState.Loaded -> ProjectTree(state.loaded, listState, collapsed, onToggle, onOpenDocument)
+                is ProjectState.Loaded -> ProjectTree(state.loaded, syncStatus, listState, toggled, onToggle, onOpenDocument)
             }
         }
     }
 
-    if (editingPath) {
-        var text by remember { mutableStateOf(projectPath) }
+    if (editingSettings) {
+        var path by remember { mutableStateOf(projectPath) }
+        var link by remember { mutableStateOf(syncLink) }
+        val linkOk = link.isBlank() || FolderSync.isValidLink(link)
         AlertDialog(
-            onDismissRequest = { editingPath = false },
-            title = { Text("Project folder") },
-            text = { OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = false) },
-            confirmButton = {
-                TextButton(onClick = { editingPath = false; onChangePath(text.trim()) }) { Text("Open") }
+            onDismissRequest = { editingSettings = false },
+            title = { Text("Settings") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(value = path, onValueChange = { path = it }, label = { Text("Project folder") })
+                    OutlinedTextField(
+                        value = link,
+                        onValueChange = { link = it },
+                        label = { Text("FolderSync sync link") },
+                        isError = !linkOk,
+                        supportingText = {
+                            Text(
+                                "In FolderSync: Settings → enable automation, then the folderpair's " +
+                                    "Automation tab → copy the Sync link. Leave empty to not sync from here."
+                            )
+                        },
+                    )
+                }
             },
-            dismissButton = { TextButton(onClick = { editingPath = false }) { Text("Cancel") } },
+            confirmButton = {
+                TextButton(enabled = linkOk, onClick = {
+                    editingSettings = false
+                    onChangeSettings(path.trim(), link.trim())
+                }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { editingSettings = false }) { Text("Cancel") } },
         )
     }
 }
@@ -103,18 +142,31 @@ fun ProjectScreen(
 @Composable
 private fun ProjectTree(
     loaded: LoadedProject,
+    syncStatus: SyncStatus,
     listState: LazyListState,
-    collapsed: Set<String>,
+    toggled: Set<String>,
     onToggle: (handle: String) -> Unit,
     onOpenDocument: (handle: String) -> Unit,
 ) {
-    val rows = flatten(loaded.project.roots, collapsed)
+    // [toggled] holds containers the user flipped from their default (Trash starts collapsed).
+    val isCollapsed = { node: ProjectNode -> (node.item.handle in toggled) != collapsedByDefault(node) }
+    val rows = flatten(loaded.project.roots, isCollapsed)
+    val summaries = remember(loaded) {
+        val map = HashMap<String, FolderSummary>()
+        fun visit(node: ProjectNode) {
+            if (node.item.type != ItemType.FILE) map[node.item.handle] = folderSummary(node)
+            node.children.forEach(::visit)
+        }
+        loaded.project.roots.forEach(::visit)
+        map
+    }
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
-        item { StatusCard(loaded) }
+        item { StatusCard(loaded, syncStatus) }
         items(rows, key = { it.node.item.handle }) { row ->
             TreeRowView(
                 row = row,
-                isCollapsed = row.node.item.handle in collapsed,
+                isCollapsed = isCollapsed(row.node),
+                summary = summaries[row.node.item.handle],
                 onClick = {
                     val handle = row.node.item.handle
                     if (row.node.item.type == ItemType.FILE) {
@@ -128,37 +180,34 @@ private fun ProjectTree(
     }
 }
 
-private fun flatten(nodes: List<ProjectNode>, collapsed: Set<String>, depth: Int = 0): List<TreeRow> =
+private fun collapsedByDefault(node: ProjectNode) =
+    node.item.type == ItemType.ROOT && node.item.itemClass == ItemClass.TRASH
+
+private fun flatten(nodes: List<ProjectNode>, isCollapsed: (ProjectNode) -> Boolean, depth: Int = 0): List<TreeRow> =
     nodes.flatMap { node ->
-        val children = if (node.item.handle in collapsed) emptyList() else flatten(node.children, collapsed, depth + 1)
+        val children = if (isCollapsed(node)) emptyList() else flatten(node.children, isCollapsed, depth + 1)
         listOf(TreeRow(node, depth)) + children
     }
 
+/** Only shown when something needs attention: a lock file, or the last sync failed. */
 @Composable
-private fun StatusCard(loaded: LoadedProject) {
+private fun StatusCard(loaded: LoadedProject, sync: SyncStatus) {
     val lock = loaded.lock
-    val colors = if (lock != null) {
-        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-    } else {
-        CardDefaults.cardColors()
-    }
-    Card(colors = colors, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (lock != null) {
-                val since = lock.lockedAt?.let { formatTime(it * 1000) } ?: "unknown time"
-                Text(
-                    "Open in novelWriter on ${lock.host.ifEmpty { "another computer" }} since $since",
-                    fontWeight = FontWeight.Bold,
-                )
-                Text("As of the last sync. Close it on the PC before editing here.", style = MaterialTheme.typography.bodySmall)
-            }
-            Text("Files last changed ${formatTime(loaded.lastChanged)}", style = MaterialTheme.typography.bodySmall)
+    val failed = sync.state as? SyncState.Failed
+    if (lock == null && failed == null) return
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth().padding(12.dp),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (lock != null) Text("Open in novelWriter on ${lock.host.ifEmpty { "the PC" }}", style = MaterialTheme.typography.bodyMedium)
+            if (failed != null) Text("Last sync ${failed.kind}", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
-private fun TreeRowView(row: TreeRow, isCollapsed: Boolean, onClick: () -> Unit) {
+private fun TreeRowView(row: TreeRow, isCollapsed: Boolean, summary: FolderSummary?, onClick: () -> Unit) {
     val item = row.node.item
     val isFile = item.type == ItemType.FILE
     Row(
@@ -182,9 +231,15 @@ private fun TreeRowView(row: TreeRow, isCollapsed: Boolean, onClick: () -> Unit)
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (isFile) {
+        val count = when {
+            isFile -> "${item.wordCount}"
+            summary is FolderSummary.Words -> "${summary.words}"
+            summary is FolderSummary.Notes -> if (summary.notes == 1) "1 note" else "${summary.notes} notes"
+            else -> null
+        }
+        if (count != null) {
             Spacer(Modifier.width(8.dp))
-            Text("${item.wordCount}", style = MaterialTheme.typography.bodySmall)
+            Text(count, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -194,8 +249,3 @@ private fun TreeRowView(row: TreeRow, isCollapsed: Boolean, onClick: () -> Unit)
 internal fun Message(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp))
 }
-
-private val TIME_FORMAT = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm")
-
-internal fun formatTime(epochMillis: Long): String =
-    TIME_FORMAT.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
