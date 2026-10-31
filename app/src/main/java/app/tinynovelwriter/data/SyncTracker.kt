@@ -3,10 +3,12 @@ package app.tinynovelwriter.data
 /** What FolderSync last reported through its webhooks, or that we're waiting for it. */
 sealed interface SyncState {
     data object Unknown : SyncState
-    /** Sync requested at [since] (ms); waiting for FolderSync's webhook. */
+    /** Sync requested at [since] (ms); no webhook yet. */
     data class Waiting(val since: Long) : SyncState
+    /** FolderSync's "starting" webhook arrived at [since]; waiting for the result. */
+    data class Running(val since: Long) : SyncState
     data class Synced(val at: Long) : SyncState
-    /** [kind] is "failed" (includes conflicts) or "cancelled". */
+    /** [kind] is "failed" (includes conflicts), "cancelled", or "noresponse" (no webhook in time). */
     data class Failed(val at: Long, val kind: String) : SyncState
 }
 
@@ -20,10 +22,13 @@ interface SyncStore {
 
 /**
  * Whether saved edits have reached FolderSync's last successful sync. Every write is
- * timestamped; a successful-sync webhook covers writes made before the sync started.
- * FolderSync doesn't say when a sync started, so for a sync this app requested that's the
- * request time, and for one FolderSync ran by itself it's assumed to be [GRACE_MS] before
- * the webhook arrived.
+ * timestamped; a successful-sync webhook covers writes made before the sync started: the
+ * request time, the "starting" webhook, or (for a sync FolderSync ran by itself without a
+ * "starting") [GRACE_MS] before the result arrived.
+ *
+ * A requested sync that sends no webhook within [START_TIMEOUT_MS] never started (e.g.
+ * Android refused FolderSync's background service); one that started but sends no result
+ * within [RUN_TIMEOUT_MS] is also reported as "noresponse".
  */
 class SyncTracker(private val store: SyncStore, private val clock: () -> Long = System::currentTimeMillis) {
 
@@ -63,19 +68,33 @@ class SyncTracker(private val store: SyncStore, private val clock: () -> Long = 
                 state = SyncState.Synced(now)
             }
             "failed", "cancelled" -> state = SyncState.Failed(now, event)
-            else -> return // "starting" arrives with the others at the end, so it says nothing
+            "starting" -> {
+                if (requestedAt == 0L) requestedAt = now
+                state = SyncState.Running(now)
+                onChange()
+                return
+            }
+            else -> return
         }
         requestedAt = 0
         save(state)
         onChange()
     }
 
-    /** No webhook came for a requested sync (e.g. the app was frozen); stop waiting. */
-    fun expireWaiting() {
-        val waiting = state as? SyncState.Waiting ?: return
-        if (clock() - waiting.since < WAIT_MS) return
+    val inProgress: Boolean get() = state is SyncState.Waiting || state is SyncState.Running
+
+    /** Call periodically while [inProgress]: reports "noresponse" once a timeout has passed. */
+    fun checkTimeout() {
+        val now = clock()
+        val expired = when (val s = state) {
+            is SyncState.Waiting -> now - s.since >= START_TIMEOUT_MS
+            is SyncState.Running -> now - s.since >= RUN_TIMEOUT_MS
+            else -> false
+        }
+        if (!expired) return
         requestedAt = 0
-        state = load()
+        state = SyncState.Failed(now, "noresponse")
+        save(state)
         onChange()
     }
 
@@ -93,14 +112,15 @@ class SyncTracker(private val store: SyncStore, private val clock: () -> Long = 
         val at = parts.getOrNull(1)?.toLongOrNull() ?: return SyncState.Unknown
         return when (parts[0]) {
             "synced" -> SyncState.Synced(at)
-            "failed", "cancelled" -> SyncState.Failed(at, parts[0])
+            "failed", "cancelled", "noresponse" -> SyncState.Failed(at, parts[0])
             else -> SyncState.Unknown
         }
     }
 
     companion object {
         const val GRACE_MS = 5_000L
-        const val WAIT_MS = 60_000L
+        const val START_TIMEOUT_MS = 15_000L
+        const val RUN_TIMEOUT_MS = 10 * 60_000L
         private const val KEY_LAST_WRITE = "sync.lastWriteAt"
         private const val KEY_COVERED = "sync.coveredUpTo"
         private const val KEY_RESULT = "sync.lastResult"

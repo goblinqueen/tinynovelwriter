@@ -36,7 +36,6 @@ import app.tinynovelwriter.data.DEFAULT_PROJECT_PATH
 import app.tinynovelwriter.data.FolderSync
 import app.tinynovelwriter.data.PrefsSyncStore
 import app.tinynovelwriter.data.ProjectFolder
-import app.tinynovelwriter.data.SyncState
 import app.tinynovelwriter.data.SyncStatus
 import app.tinynovelwriter.data.SyncTracker
 import app.tinynovelwriter.data.WebhookListener
@@ -143,11 +142,11 @@ private fun App(
             if (error == null) syncTracker.noteSyncRequested() else Toast.makeText(context, error, Toast.LENGTH_LONG).show()
         }
     }
-    // Stop waiting if FolderSync's webhook never comes (e.g. the app was frozen meanwhile).
+    // Report "no response" if FolderSync's webhooks don't come in time.
     LaunchedEffect(syncVersion, resumeCount) {
-        if (syncTracker.state is SyncState.Waiting) {
-            delay(SyncTracker.WAIT_MS)
-            syncTracker.expireWaiting()
+        while (syncTracker.inProgress) {
+            delay(1000)
+            syncTracker.checkTimeout()
         }
     }
     val syncStatus = remember(syncVersion) { SyncStatus(syncTracker.state, syncTracker.unsynced) }

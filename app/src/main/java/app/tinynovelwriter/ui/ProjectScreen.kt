@@ -18,6 +18,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -27,11 +29,17 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import app.tinynovelwriter.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -76,21 +84,14 @@ fun ProjectScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    val title = (state as? ProjectState.Loaded)?.loaded?.project?.name ?: "TinyNovelWriter"
-                    Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                title = {},
+                navigationIcon = {
+                    IconButton(onClick = { editingSettings = true }) {
+                        Icon(painterResource(R.drawable.ic_settings), contentDescription = "Settings")
+                    }
                 },
                 actions = {
-                    if (FolderSync.isValidLink(syncLink)) {
-                        val waiting = syncStatus.state is SyncState.Waiting
-                        TextButton(onClick = onSync, enabled = !waiting) {
-                            if (syncStatus.unsynced && !waiting) {
-                                Text("● ", color = MaterialTheme.colorScheme.error)
-                            }
-                            Text(if (waiting) "Syncing…" else "Sync")
-                        }
-                    }
-                    TextButton(onClick = { editingSettings = true }) { Text("Settings") }
+                    if (FolderSync.isValidLink(syncLink)) SyncButton(syncStatus, onSync)
                 },
             )
         },
@@ -160,22 +161,33 @@ private fun ProjectTree(
         loaded.project.roots.forEach(::visit)
         map
     }
-    LazyColumn(Modifier.fillMaxSize(), state = listState) {
-        item { StatusCard(loaded, syncStatus) }
-        items(rows, key = { it.node.item.handle }) { row ->
-            TreeRowView(
-                row = row,
-                isCollapsed = isCollapsed(row.node),
-                summary = summaries[row.node.item.handle],
-                onClick = {
-                    val handle = row.node.item.handle
-                    if (row.node.item.type == ItemType.FILE) {
-                        onOpenDocument(handle)
-                    } else {
-                        onToggle(handle)
-                    }
-                },
-            )
+    // The warnings sit above the list, so they stay visible while scrolling.
+    Column(Modifier.fillMaxSize()) {
+        StatusCard(loaded, syncStatus)
+        LazyColumn(Modifier.fillMaxSize(), state = listState) {
+            // The project name heads the table of contents; it wraps and scrolls with it.
+            item(key = "project-name") {
+                Text(
+                    loaded.project.name.ifEmpty { "(unnamed project)" },
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+                )
+            }
+            items(rows, key = { it.node.item.handle }) { row ->
+                TreeRowView(
+                    row = row,
+                    isCollapsed = isCollapsed(row.node),
+                    summary = summaries[row.node.item.handle],
+                    onClick = {
+                        val handle = row.node.item.handle
+                        if (row.node.item.type == ItemType.FILE) {
+                            onOpenDocument(handle)
+                        } else {
+                            onToggle(handle)
+                        }
+                    },
+                )
+            }
         }
     }
 }
@@ -189,6 +201,13 @@ private fun flatten(nodes: List<ProjectNode>, isCollapsed: (ProjectNode) -> Bool
         listOf(TreeRow(node, depth)) + children
     }
 
+/** Placeholder wording; the user will supply the final texts. */
+private fun syncFailureText(kind: String) = when (kind) {
+    "noresponse" -> "FolderSync didn't respond"
+    "cancelled" -> "Last sync cancelled"
+    else -> "Last sync failed"
+}
+
 /** Only shown when something needs attention: a lock file, or the last sync failed. */
 @Composable
 private fun StatusCard(loaded: LoadedProject, sync: SyncStatus) {
@@ -201,10 +220,41 @@ private fun StatusCard(loaded: LoadedProject, sync: SyncStatus) {
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (lock != null) Text("Open in novelWriter on ${lock.host.ifEmpty { "the PC" }}", style = MaterialTheme.typography.bodyMedium)
-            if (failed != null) Text("Last sync ${failed.kind}", style = MaterialTheme.typography.bodyMedium)
+            if (failed != null) Text(syncFailureText(failed.kind), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
+
+/**
+ * The top bar's sync button: "Syncing…" while FolderSync works, a green "Synced" for
+ * [SUCCESS_SHOWN_MS] after it succeeds, then "Sync" (with a red dot if edits are waiting).
+ */
+@Composable
+private fun SyncButton(sync: SyncStatus, onSync: () -> Unit) {
+    val synced = sync.state as? SyncState.Synced
+    var justSynced by remember(synced?.at) {
+        mutableStateOf(synced != null && System.currentTimeMillis() - synced.at < SUCCESS_SHOWN_MS)
+    }
+    LaunchedEffect(synced?.at) {
+        if (justSynced && synced != null) {
+            delay(SUCCESS_SHOWN_MS - (System.currentTimeMillis() - synced.at))
+            justSynced = false
+        }
+    }
+    val waiting = sync.state is SyncState.Waiting || sync.state is SyncState.Running
+    TextButton(onClick = onSync, enabled = !waiting) {
+        when {
+            waiting -> Text("Syncing…")
+            justSynced -> Text("Synced", color = if (isSystemInDarkTheme()) Color(0xFF8FD19E) else Color(0xFF1E7A34))
+            else -> {
+                if (sync.unsynced) Text("● ", color = MaterialTheme.colorScheme.error)
+                Text("Sync")
+            }
+        }
+    }
+}
+
+private const val SUCCESS_SHOWN_MS = 2000L
 
 @Composable
 private fun TreeRowView(row: TreeRow, isCollapsed: Boolean, summary: FolderSummary?, onClick: () -> Unit) {

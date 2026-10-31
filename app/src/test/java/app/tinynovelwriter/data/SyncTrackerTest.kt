@@ -54,12 +54,47 @@ class SyncTrackerTest {
     }
 
     @Test
-    fun startingEventIsIgnored() {
+    fun startingMeansRunningAndStopsTheShortTimeout() {
+        val t = tracker()
+        t.noteSyncRequested()
+        now += 2000; t.onWebhook("starting")
+        assertTrue(t.state is SyncState.Running)
+        now += SyncTracker.START_TIMEOUT_MS; t.checkTimeout()
+        assertTrue(t.state is SyncState.Running)
+        now += 1000; t.onWebhook("successful")
+        assertTrue(t.state is SyncState.Synced)
+    }
+
+    @Test
+    fun noWebhookAfterRequestIsNoResponse() {
         val t = tracker()
         t.noteWrite()
-        now += 10_000; t.onWebhook("starting")
+        now += 1000; t.noteSyncRequested()
+        now += SyncTracker.START_TIMEOUT_MS - 1; t.checkTimeout()
+        assertTrue(t.state is SyncState.Waiting)
+        now += 1; t.checkTimeout()
+        assertEquals(SyncState.Failed(now, "noresponse"), t.state)
         assertTrue(t.unsynced)
-        assertEquals(SyncState.Unknown, t.state)
+        assertEquals(t.state, tracker().state) // survives a restart
+    }
+
+    @Test
+    fun startedSyncWithoutResultTimesOutLater() {
+        val t = tracker()
+        t.noteSyncRequested()
+        now += 1000; t.onWebhook("starting")
+        now += SyncTracker.RUN_TIMEOUT_MS; t.checkTimeout()
+        assertEquals("noresponse", (t.state as SyncState.Failed).kind)
+    }
+
+    @Test
+    fun startingFromFolderSyncItselfMarksTheStart() {
+        val t = tracker()
+        t.noteWrite()
+        now += 1000; t.onWebhook("starting")
+        now += 1000; t.noteWrite() // during the sync
+        now += 30_000; t.onWebhook("successful")
+        assertTrue(t.unsynced)
     }
 
     @Test
@@ -73,18 +108,6 @@ class SyncTrackerTest {
         now += 1000; t.noteWrite()
         now += 1000; t.onWebhook("successful")
         assertTrue(t.unsynced)
-    }
-
-    @Test
-    fun waitingExpiresBackToTheLastResult() {
-        val t = tracker()
-        t.onWebhook("successful")
-        val synced = t.state
-        now += 1000; t.noteSyncRequested()
-        now += SyncTracker.WAIT_MS - 1; t.expireWaiting()
-        assertTrue(t.state is SyncState.Waiting)
-        now += 1; t.expireWaiting()
-        assertEquals(synced, t.state)
     }
 
     @Test
