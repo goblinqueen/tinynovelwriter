@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- novelWriter's logo colours: cover, spine, and the edge between them. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#346598" android:pathData="M0,0h108v108h-108z" />
+    <path android:fillColor="#1A344E" android:pathData="M0,0h39.05v108h-39.05z" />
+    <path android:fillColor="#28527A" android:pathData="M39.05,0h2v108h-2z" />
+</vector>

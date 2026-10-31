@@ -17,7 +17,9 @@
     </queries>
 
     <application
+        android:icon="@mipmap/ic_launcher"
         android:label="TinyNovelWriter"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.Tiny">
         <activity
             android:name=".MainActivity"
