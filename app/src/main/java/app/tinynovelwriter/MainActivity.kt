@@ -48,6 +48,7 @@ import app.tinynovelwriter.ui.EditorStatus
 import app.tinynovelwriter.ui.ProjectScreen
 import app.tinynovelwriter.ui.ProjectState
 import app.tinynovelwriter.ui.TinyTheme
+import app.tinynovelwriter.ui.Typewriter
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -57,6 +58,7 @@ import kotlinx.coroutines.withContext
 private const val PREFS = "settings"
 private const val KEY_PROJECT_PATH = "projectPath"
 private const val KEY_SYNC_LINK = "folderSyncLink"
+private const val KEY_TYPEWRITER_POSITION = "typewriterPosition"
 private const val AUTOSAVE_DELAY_MS = 2000L
 
 class MainActivity : ComponentActivity() {
@@ -88,6 +90,8 @@ class MainActivity : ComponentActivity() {
                         savePath = { prefs.edit().putString(KEY_PROJECT_PATH, it).apply() },
                         initialSyncLink = prefs.getString(KEY_SYNC_LINK, null).orEmpty(),
                         saveSyncLink = { prefs.edit().putString(KEY_SYNC_LINK, it).apply() },
+                        initialTypewriterPosition = prefs.getInt(KEY_TYPEWRITER_POSITION, Typewriter.DEFAULT_POSITION),
+                        saveTypewriterPosition = { prefs.edit().putInt(KEY_TYPEWRITER_POSITION, it).apply() },
                         syncTracker = syncTracker,
                         syncVersion = syncVersion,
                         resumeCount = resumeCount,
@@ -129,6 +133,8 @@ private fun App(
     savePath: (String) -> Unit,
     initialSyncLink: String,
     saveSyncLink: (String) -> Unit,
+    initialTypewriterPosition: Int,
+    saveTypewriterPosition: (Int) -> Unit,
     syncTracker: SyncTracker,
     /** Changes whenever [syncTracker] does; read so that its state is observed. */
     syncVersion: Int,
@@ -142,6 +148,7 @@ private fun App(
     var toggled by rememberSaveable(path) { mutableStateOf(setOf<String>()) }
     val folder = ProjectFolder(File(path))
     var syncLink by rememberSaveable { mutableStateOf(initialSyncLink) }
+    var typewriterPosition by rememberSaveable { mutableIntStateOf(initialTypewriterPosition) }
     val context = LocalContext.current
     val sync: () -> Unit = {
         if (syncLink.isNotBlank()) {
@@ -185,11 +192,14 @@ private fun App(
             onToggle = { toggled = if (it in toggled) toggled - it else toggled + it },
             syncLink = syncLink,
             syncStatus = syncStatus,
-            onChangeSettings = { newPath, newLink ->
+            typewriterPosition = typewriterPosition,
+            onChangeSettings = { newPath, newLink, newPosition ->
                 path = newPath
                 savePath(newPath)
                 syncLink = newLink
                 saveSyncLink(newLink)
+                typewriterPosition = newPosition
+                saveTypewriterPosition(newPosition)
             },
             onSync = sync,
             onOpenDocument = { openHandle = it },
@@ -226,6 +236,7 @@ private fun App(
             onLeave = { openHandle = null },
             refreshing = refreshing,
             onRefresh = onRefresh,
+            typewriterPosition = typewriterPosition,
         )
     }
 }

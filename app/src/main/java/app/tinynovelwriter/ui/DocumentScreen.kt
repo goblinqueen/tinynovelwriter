@@ -8,9 +8,14 @@ import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -55,6 +60,8 @@ fun DocumentScreen(
     onLeave: () -> Unit,
     refreshing: Boolean,
     onRefresh: () -> Unit,
+    /** Typewriter scrolling position, in percent of the visible height. */
+    typewriterPosition: Int,
 ) {
     val scope = rememberCoroutineScope()
     val status = editor.status
@@ -123,7 +130,7 @@ fun DocumentScreen(
                     is EditorStatus.Unavailable -> Message(status.message.resolve())
                     else ->
                         if (text.isBlank() && !editor.editing) Message(stringResource(R.string.document_empty))
-                        else DocumentText(editor.value, editor::onValueChange, readOnly = !editor.editing, editor.item?.itemClass)
+                        else DocumentText(editor.value, editor::onValueChange, readOnly = !editor.editing, editor.item?.itemClass, typewriterPosition)
                 }
             }
         }
@@ -157,6 +164,7 @@ private fun DocumentText(
     onValueChange: (TextFieldValue) -> Unit,
     readOnly: Boolean,
     itemClass: ItemClass?,
+    typewriterPosition: Int,
 ) {
     val colors = MaterialTheme.colorScheme
     val markupColors = TinyColors.markup
@@ -178,32 +186,66 @@ private fun DocumentText(
         }
     }
     val vertical = remember { VerticalArrows() }
+    // Typewriter scrolling: an edit records the caret's top before it, the new layout
+    // compares it with the caret's top after it.
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val topPadding = 12.dp
+    val topPaddingPx = with(density) { topPadding.toPx() }
+    val caretBefore = remember { CaretBefore() }
+    fun caretTop(layout: TextLayoutResult, offset: Int) =
+        topPaddingPx + layout.getCursorRect(offset.coerceIn(0, layout.layoutInput.text.length)).top
+    val change: (TextFieldValue) -> Unit = { new ->
+        if (!readOnly && new.text != value.text) vertical.layout?.let { caretBefore.top = caretTop(it, value.selection.end) }
+        onValueChange(new)
+    }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
             BasicTextField(
                 value = value,
-                onValueChange = onValueChange,
+                onValueChange = change,
                 readOnly = readOnly,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
                 cursorBrush = SolidColor(colors.primary),
                 visualTransformation = markup,
-                onTextLayout = { vertical.layout = it },
+                onTextLayout = { layout ->
+                    vertical.layout = layout
+                    val before = caretBefore.top
+                    if (before != null && layout.layoutInput.text.text == value.text) {
+                        caretBefore.top = null
+                        if (value.selection.collapsed) {
+                            val after = caretTop(layout, value.selection.end)
+                            Typewriter.target(before, after, scroll.value, scroll.viewportSize, typewriterPosition)?.let {
+                                scope.launch { scroll.animateScrollTo(it, tween(Typewriter.DURATION_MS)) }
+                            }
+                        }
+                    }
+                },
                 // Extra end padding keeps text clear of the scrollbar.
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focus)
                     .onPreviewKeyEvent { event ->
                         if (readOnly) return@onPreviewKeyEvent false
-                        val moved = lineEdgeKey(event, value, vertical.layout)
+                        val moved = formatKey(event, value)
+                            ?: lineEdgeKey(event, value, vertical.layout)
                             ?: horizontalArrow(event, value)
                             ?: vertical.handle(event, value)
                             ?: return@onPreviewKeyEvent false
-                        if (moved != value) onValueChange(moved)
+                        if (moved != value) change(moved)
                         true
                     }
-                    .padding(start = 16.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = 16.dp, end = 24.dp, top = topPadding, bottom = 12.dp),
             )
+            // Scroll past the end while editing, so the last line can reach the typewriter position.
+            if (!readOnly) Spacer(Modifier.height(with(density) { (scroll.viewportSize * (100 - typewriterPosition) / 100f).toDp() }))
         }
         VerticalScrollbar(scroll, Modifier.align(Alignment.CenterEnd))
     }
+}
+
+
+/** Not state: it's written during layout and must not trigger recomposition. */
+private class CaretBefore {
+    var top: Float? = null
 }

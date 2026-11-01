@@ -30,6 +30,9 @@
     <string name="settings_project_folder">Project folder</string>
     <string name="settings_sync_link">FolderSync sync link</string>
     <string name="settings_sync_link_help">In FolderSync: Settings → enable automation, then the folderpair\'s Automation tab → copy the Sync link. Leave empty to not sync from here.</string>
+    <string name="settings_typewriter_position">Typewriter position, %</string>
+    <!-- %1$d and %2$d: the allowed range -->
+    <string name="settings_typewriter_position_help">While typing, the current line is kept this far down the visible area (%1$d–%2$d).</string>
 
     <!-- Sync button and results -->
     <string name="sync">Sync</string>

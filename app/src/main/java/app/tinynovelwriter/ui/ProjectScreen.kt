@@ -27,6 +27,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -78,7 +80,8 @@ fun ProjectScreen(
     onToggle: (handle: String) -> Unit,
     syncLink: String,
     syncStatus: SyncStatus,
-    onChangeSettings: (path: String, syncLink: String) -> Unit,
+    typewriterPosition: Int,
+    onChangeSettings: (path: String, syncLink: String, typewriterPosition: Int) -> Unit,
     onSync: () -> Unit,
     onOpenDocument: (handle: String) -> Unit,
     refreshing: Boolean,
@@ -114,6 +117,8 @@ fun ProjectScreen(
         var path by remember { mutableStateOf(projectPath) }
         var link by remember { mutableStateOf(syncLink) }
         val linkOk = link.isBlank() || FolderSync.isValidLink(link)
+        var position by remember { mutableStateOf(typewriterPosition.toString()) }
+        val positionValue = position.trim().toIntOrNull()?.takeIf { it in Typewriter.POSITIONS }
         AlertDialog(
             onDismissRequest = { editingSettings = false },
             title = { Text(stringResource(R.string.settings)) },
@@ -129,12 +134,23 @@ fun ProjectScreen(
                             Text(stringResource(R.string.settings_sync_link_help))
                         },
                     )
+                    OutlinedTextField(
+                        value = position,
+                        onValueChange = { position = it },
+                        label = { Text(stringResource(R.string.settings_typewriter_position)) },
+                        isError = positionValue == null,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        supportingText = {
+                            Text(stringResource(R.string.settings_typewriter_position_help, Typewriter.POSITIONS.first, Typewriter.POSITIONS.last))
+                        },
+                    )
                 }
             },
             confirmButton = {
-                TextButton(enabled = linkOk, onClick = {
+                TextButton(enabled = linkOk && positionValue != null, onClick = {
                     editingSettings = false
-                    onChangeSettings(path.trim(), link.trim())
+                    onChangeSettings(path.trim(), link.trim(), positionValue ?: typewriterPosition)
                 }) { Text(stringResource(R.string.save)) }
             },
             dismissButton = { TextButton(onClick = { editingSettings = false }) { Text(stringResource(R.string.cancel)) } },

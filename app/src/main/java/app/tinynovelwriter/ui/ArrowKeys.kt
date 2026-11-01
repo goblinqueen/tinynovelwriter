@@ -12,6 +12,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import app.tinynovelwriter.format.FormatToggle
 import java.text.BreakIterator
 
 /**
@@ -126,4 +127,17 @@ private fun nextWord(text: String, from: Int): Int {
     // Stop at the end of a word rather than after the following spaces.
     while (pos != BreakIterator.DONE && pos < text.length && !text[pos - 1].isLetterOrDigit()) pos = words.following(pos)
     return if (pos == BreakIterator.DONE) text.length else pos
+}
+
+/** Ctrl+B / Ctrl+I toggle bold / italic like novelWriter. Returns null for other keys. */
+fun formatKey(event: KeyEvent, value: TextFieldValue): TextFieldValue? {
+    if (!event.isCtrlPressed || event.isAltPressed || event.isShiftPressed) return null
+    val toggle = when (event.key) {
+        Key.B -> FormatToggle::bold
+        Key.I -> FormatToggle::italic
+        else -> return null
+    }
+    if (event.type != KeyEventType.KeyDown) return value
+    val edited = toggle(value.text, value.selection.start, value.selection.end) ?: return value
+    return TextFieldValue(edited.text, TextRange(edited.start, edited.end))
 }
