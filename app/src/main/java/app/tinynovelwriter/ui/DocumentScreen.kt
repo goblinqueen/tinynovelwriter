@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -205,6 +207,7 @@ private fun DocumentText(
                 value = value,
                 onValueChange = change,
                 readOnly = readOnly,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
                 cursorBrush = SolidColor(colors.primary),
                 visualTransformation = markup,
