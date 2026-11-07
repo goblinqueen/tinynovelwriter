@@ -1,6 +1,9 @@
 package app.tinynovelwriter.format
 
-/** novelWriter's ProjectItem.isNovelLike: classes that hold novel documents rather than notes. */
+/**
+ * Classes that hold novel documents rather than notes.
+ * Source: novelWriter 26.3b1, `novelwriter/core/item.py` `ProjectItem.isNovelLike`.
+ */
 fun ItemClass.isNovelLike(): Boolean = this == ItemClass.NOVEL || this == ItemClass.ARCHIVE || this == ItemClass.TEMPLATE
 
 /** What a root or folder shows next to its name. */

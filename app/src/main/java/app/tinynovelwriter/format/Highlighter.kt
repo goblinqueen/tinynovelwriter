@@ -1,6 +1,9 @@
 package app.tinynovelwriter.format
 
-/** What a stretch of text is, for highlighting. Mirrors novelWriter's editor formats. */
+/**
+ * What a stretch of text is, for highlighting. Mirrors novelWriter's editor formats.
+ * Source: novelWriter 26.3b1, `novelwriter/editor/highlighter.py` `GuiDocHighlighter.initHighlighter`.
+ */
 enum class Markup {
     HEADING_MARK, HEADING, BOLD, ITALIC, STRIKE, MARK, NOBREAK, MARKUP, HIDDEN,
     LINK, NOTE, CODE, KEYWORD, TAG, VALUE, OPTIONAL, MODIFIER, REPLACE,
@@ -10,18 +13,20 @@ enum class Markup {
 data class MarkupSpan(val start: Int, val end: Int, val kind: Markup)
 
 /**
- * Port of novelWriter's `GuiDocHighlighter.highlightBlock` (editor/highlighter.py), with
- * the user's settings: `**` bold only, emphasis coloured, no dialogue highlighting.
+ * Port of novelWriter's editor highlighter, with the user's settings: `**` bold only,
+ * emphasis coloured, no dialogue highlighting.
  * Differences: tags can't be checked against the index, so every value of a valid
  * keyword counts as a good tag; invalid keywords and values get no style (novelWriter
  * gives them a squiggly underline).
  *
  * Spans are meant to be applied in order, each merged over the earlier ones, like
  * `QTextCharFormat.merge`. Markup characters (`**`, `_`, brackets) take no later styles.
+ *
+ * Source: novelWriter 26.3b1, `novelwriter/editor/highlighter.py` `GuiDocHighlighter.highlightBlock`.
  */
 object Highlighter {
 
-    private const val MAX_LINE_LENGTH = 20000
+    private const val MAX_LINE_LENGTH = 20000 // highlighter.py MAX_BLOCK_LENGTH
 
     // Python's \w and \s are Unicode-aware; Java's (and Android's) aren't the same, so spell them out.
     private const val WC = """\p{L}\p{N}_"""
@@ -31,6 +36,10 @@ object Highlighter {
         Regex("""(?<![$WC\\])($mark)(?![$SC$char])(.+?)(?<![$SC\\])(\1)(?![$WC])""")
 
     private class Rule(val regex: Regex, val groups: Map<Int, Markup>)
+
+    // Patterns from novelWriter 26.3b1: `novelwriter/text/patterns.py` (REGEX_PATTERNS) and
+    // `novelwriter/constants.py` (nwRegEx); which groups get which style, and the rule
+    // order, from GuiDocHighlighter.initHighlighter.
 
     private val NOBREAK = Rule(Regex("[  ]+"), mapOf(0 to Markup.NOBREAK))
     private val ITALIC = Rule(emphasis("_", "_"), mapOf(1 to Markup.MARKUP, 2 to Markup.ITALIC, 3 to Markup.MARKUP))
@@ -65,14 +74,19 @@ object Highlighter {
 
     private val HEADINGS = listOf("# ", "## ", "### ", "#### ", "#! ", "##! ", "###! ")
 
+    // novelwriter/constants.py nwKeyWords.VALID_KEYS
     private val VALID_KEYS = setOf(
         "@tag", "@pov", "@focus", "@char", "@plot", "@time", "@location",
         "@object", "@entity", "@custom", "@story", "@mention",
     )
 
-    /** Comment modifiers and whether a `.key` is not allowed (0), optional (1) or required (2). */
+    /**
+     * Comment modifiers and whether a `.key` is not allowed (0), optional (1) or required (2).
+     * novelwriter/text/formats.py MODIFIERS and processComment.
+     */
     private val MODIFIERS = mapOf("synopsis" to 0, "short" to 0, "note" to 1, "footnote" to 2, "story" to 2)
 
+    // novelwriter/core/item.py ProjectItem.isInactiveClass
     private val INACTIVE = setOf(ItemClass.NO_CLASS, ItemClass.ARCHIVE, ItemClass.TEMPLATE, ItemClass.TRASH)
 
     /**
@@ -135,7 +149,7 @@ object Highlighter {
             }
         }
 
-        /** `@keyword: value, value|display`, like `NWIndex.scanThis`. */
+        /** `@keyword: value, value|display`, split like `Index.scanThis` (novelwriter/core/index.py). */
         fun keywords(inactive: Boolean) {
             val line = text.trimEnd()
             if (line.length < 2) return

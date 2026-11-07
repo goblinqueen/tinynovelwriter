@@ -4,6 +4,7 @@ package app.tinynovelwriter.format
  * Typing replacements, ported from novelWriter's `TextAutoReplace` (text/autoreplace.py),
  * dashes only: `--` → en dash, `---` (or en dash + `-`) → em dash, `----` (or em dash +
  * `-`) → horizontal bar. Like novelWriter, it only acts right after a single typed character.
+ * Source: novelWriter 26.3b1, `novelwriter/text/autoreplace.py` `TextAutoReplace._determine`.
  */
 object AutoReplace {
 

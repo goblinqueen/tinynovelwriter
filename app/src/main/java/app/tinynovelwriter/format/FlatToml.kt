@@ -4,6 +4,9 @@ package app.tinynovelwriter.format
  * The flat subset of TOML used by novelWriter document headers: one `key = value` per
  * line, with basic or literal strings, integers or booleans. Anything else is rejected,
  * like Python's tomllib would reject invalid TOML.
+ *
+ * novelWriter reads headers with `NTomlParser(flat=True)` (`novelwriter/formats/tomlparser.py`,
+ * novelWriter 26.3b1), a wrapper around Python's `tomllib`; the rules here are tomllib's for this subset.
  */
 internal object FlatToml {
 

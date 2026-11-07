@@ -4,11 +4,15 @@ package app.tinynovelwriter.format
 data class TextCounts(val chars: Int, val words: Int, val paragraphs: Int)
 
 /**
- * Port of novelWriter's `text/counting.py`, so counts match the desktop app. Headings
+ * Port of novelWriter's word counter, so counts match the desktop app. Headings
  * count as words; comments (`%`) and keywords (`@`) don't; shortcodes are stripped.
+ * Source: novelWriter 26.3b1, `novelwriter/text/counting.py` `standardCounter`.
+ * Also `preProcessText`.
  */
 object Counting {
 
+    // RX_SC and RX_SV are nwRegEx.FMT_SC / FMT_SV (`novelwriter/constants.py`);
+    // RX_LO is from text/counting.py.
     private val RX_SC = Regex("""(?i)(?<!\\)(\[(?:b|/b|i|/i|s|/s|u|/u|m|/m|sup|/sup|sub|/sub|br)\])""")
     private val RX_SV = Regex("""(?i)(?<!\\)(\[(?:footnote|field):)(.+?)(?<!\\)(\])""")
     private val RX_LO = Regex("""(?i)(?<!\\)(\[(?:vspace|newpage|new page)(:\d+)?)(?<!\\)(\])""")

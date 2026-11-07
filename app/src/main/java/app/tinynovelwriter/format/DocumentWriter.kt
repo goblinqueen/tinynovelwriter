@@ -4,7 +4,10 @@ import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-/** novelWriter's FMT_TSTAMP, in local time. */
+/**
+ * Timestamp format, in local time.
+ * Source: novelWriter 26.3b1, `novelwriter/constants.py` `nwConst.FMT_TSTAMP`.
+ */
 private val TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 fun formatTimestamp(time: LocalDateTime): String = TIMESTAMP.format(time)
@@ -33,7 +36,10 @@ data class RenderedDocument(
     val meta: DocumentMeta,
 )
 
-/** Port of novelWriter's ProjectDocument.writeDocument, without the file I/O. */
+/**
+ * Builds a document file the way novelWriter saves one, without the file I/O.
+ * Source: novelWriter 26.3b1, `novelwriter/core/document.py` `ProjectDocument.writeDocument`.
+ */
 object DocumentWriter {
 
     /**
@@ -87,7 +93,10 @@ object DocumentWriter {
         return RenderedDocument(content.toByteArray(Charsets.UTF_8), body, meta)
     }
 
-    /** NTomlParser._dumpStr: a basic string escaping only \ " tab LF CR. */
+    /**
+     * A basic string escaping only \ " tab LF CR.
+     * Source: novelWriter 26.3b1, `novelwriter/formats/tomlparser.py` `NTomlParser._dumpStr`.
+     */
     internal fun dumpString(value: String): String {
         val escaped = value
             .replace("\\", "\\\\")

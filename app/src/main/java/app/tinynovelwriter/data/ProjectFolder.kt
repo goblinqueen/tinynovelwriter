@@ -77,6 +77,7 @@ class ProjectFolder(val root: File) {
      * Saves [text] over the document, the way novelWriter does: refuse if the file changed
      * on disk since [opened] (unless [overwrite]), write `<handle>.tmp`, then atomically
      * replace the `.md`. Header fields come from the tree via [item].
+     * Source: novelWriter 26.3b1, `novelwriter/core/document.py` `ProjectDocument.writeDocument`.
      */
     fun saveDocument(
         opened: OpenedDocument,
@@ -141,6 +142,7 @@ class ProjectFolder(val root: File) {
      * project file, so novelWriter rebuilds the whole index on the next open (with a
      * "Rebuilding index" message). The old index is kept as `index.json.old`, replacing
      * the previous one. Best effort: a failure here doesn't undo the save.
+     * The revision check is `Index.indexRebuild` (`novelwriter/core/index.py`, novelWriter 26.3b1).
      */
     private fun retireIndex() {
         val index = File(root, "meta/$INDEX_FILE")

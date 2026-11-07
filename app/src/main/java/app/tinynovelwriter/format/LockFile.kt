@@ -1,6 +1,9 @@
 package app.tinynovelwriter.format
 
-/** Contents of `nwProject.lock`: `host;os;kernel;unixtime`, written by novelWriter on open. */
+/**
+ * Contents of `nwProject.lock`: `host;os;kernel;unixtime`, written by novelWriter on open.
+ * Source: novelWriter 26.3b1, `novelwriter/core/storage.py` `ProjectStorage._readLockFile`.
+ */
 data class LockInfo(
     val host: String,
     val os: String,

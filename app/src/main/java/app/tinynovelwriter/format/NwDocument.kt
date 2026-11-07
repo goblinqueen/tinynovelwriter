@@ -4,9 +4,16 @@ import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 
-/** Header lines novelWriter will scan for the closing `+++` (MAX_META_LINES). */
+/**
+ * Header lines novelWriter will scan for the closing `+++`.
+ * Source: novelWriter 26.3b1, `novelwriter/core/document.py` `MAX_META_LINES`.
+ */
 private const val MAX_META_LINES = 20
 
+/**
+ * Header fields and their defaults.
+ * Source: novelWriter 26.3b1, `novelwriter/core/document.py` `DocumentMeta`.
+ */
 data class DocumentMeta(
     val name: String = "",
     val parent: String? = null,
@@ -38,6 +45,7 @@ class DocumentFormatException(message: String, cause: Throwable? = null) : Excep
 /**
  * Reads `content/<handle>.md` the way novelWriter's ProjectDocument.readDocument does:
  * strict UTF-8, universal newlines, optional TOML header between `+++` lines.
+ * Source: novelWriter 26.3b1, `novelwriter/core/document.py` `ProjectDocument.readDocument`.
  */
 object DocumentReader {
 
@@ -79,7 +87,10 @@ object DocumentReader {
     /** Python text mode: `\r\n` and lone `\r` both become `\n`. */
     internal fun normalizeNewlines(text: String): String = text.replace("\r\n", "\n").replace('\r', '\n')
 
-    /** Port of ProjectDocument._splitHeader. Lines keep their trailing `\n`. */
+    /**
+     * Lines keep their trailing `\n`.
+     * Source: novelWriter 26.3b1, `novelwriter/core/document.py` `ProjectDocument._splitHeader`.
+     */
     internal fun splitHeader(content: String): Pair<List<String>, String> {
         var pos = 0
         fun readLine(): String {
@@ -120,8 +131,9 @@ object DocumentReader {
 }
 
 /**
- * Port of novelWriter's stripUnsafe: drops C0/C1 control characters and lone
- * surrogates, keeping `\t \n \v \f \r`, U+001C..U+001F and U+0085.
+ * Drops C0/C1 control characters and lone surrogates, keeping `\t \n \v \f \r`,
+ * U+001C..U+001F and U+0085.
+ * Source: novelWriter 26.3b1, `novelwriter/common.py` `stripUnsafe`.
  */
 internal fun stripUnsafe(text: String): String {
     val sb = StringBuilder(text.length)

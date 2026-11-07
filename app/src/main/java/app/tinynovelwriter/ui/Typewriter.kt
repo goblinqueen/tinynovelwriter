@@ -8,15 +8,17 @@ import kotlin.math.roundToInt
  * stays put. novelWriter holds the line wherever it is below its 30% setting; a phone
  * shows few lines, so here the caret is held at the position set in Settings
  * (default [DEFAULT_POSITION] %), and typing below it glides the line up to it.
+ * Source: novelWriter 26.3b1, `novelwriter/editor/editor.py` `GuiDocEditor.keyPressEvent`.
+ * Scrolling past the end from `GuiDocEditor.updateDocMargins`.
  */
 object Typewriter {
 
     /** Where the typing line is held, in percent of the visible height. */
     const val DEFAULT_POSITION = 60
-    /** The range allowed in Settings, as in novelWriter. */
+    /** The range allowed in Settings, as in novelWriter (`novelwriter/dialogs/preferences.py`). */
     val POSITIONS = 10..90
 
-    /** Length of the scroll, as in novelWriter. */
+    /** Length of the scroll, as in novelWriter (GuiDocEditor.keyPressEvent). */
     const val DURATION_MS = 120
 
     /**

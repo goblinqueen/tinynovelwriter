@@ -33,7 +33,10 @@ data class MarkupColors(
     val whitespace: Color,
 )
 
-/** novelWriter's editor styles (`GuiDocHighlighter.initHighlighter`), headings at normal size. */
+/**
+ * novelWriter's editor styles, headings at normal size.
+ * Source: novelWriter 26.3b1, `novelwriter/editor/highlighter.py` `GuiDocHighlighter.initHighlighter`.
+ */
 private fun MarkupColors.style(kind: Markup): SpanStyle = when (kind) {
     Markup.HEADING_MARK -> SpanStyle(color = headerTag, fontWeight = FontWeight.Bold)
     Markup.HEADING -> SpanStyle(color = headerText, fontWeight = FontWeight.Bold)

@@ -4,9 +4,13 @@ import java.io.InputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 
-/** Project file format version this app understands (novelWriter 26.2+). */
+/**
+ * Project file format version this app understands (novelWriter 26.2+).
+ * Source: novelWriter 26.3b1, `novelwriter/core/projectxml.py` `FILE_VERSION`.
+ */
 const val SUPPORTED_FILE_VERSION = "1.6"
 
+// Source: novelWriter 26.3b1, `novelwriter/enum.py` `nwItemType`. Also `nwItemClass`, `nwItemLayout`.
 enum class ItemType { NO_TYPE, ROOT, FOLDER, FILE }
 
 enum class ItemClass {
@@ -45,7 +49,10 @@ data class NwProject(
 
 class ProjectFormatException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-/** Reads `nwProject.nwx`. Read-only: this app never writes the project file. */
+/**
+ * Reads `nwProject.nwx`. Read-only: this app never writes the project file.
+ * Source: novelWriter 26.3b1, `novelwriter/core/projectxml.py` `ProjectXMLReader`.
+ */
 object ProjectXml {
 
     fun parse(input: InputStream): NwProject {
@@ -130,9 +137,10 @@ object ProjectXml {
     }
 
     /**
-     * Mirrors novelWriter's NWTree.unpack: order comes from the file, not the `order`
-     * attribute; items may appear before their parent; non-root items whose parent is
-     * missing are left out; duplicates keep the first one.
+     * Order comes from the file, not the `order` attribute; items may appear before
+     * their parent; non-root items whose parent is missing are left out; duplicates
+     * keep the first one.
+     * Source: novelWriter 26.3b1, `novelwriter/core/tree.py` `ProjectTree.unpack`.
      */
     private fun buildTree(parsed: List<ProjectItem>): Pair<List<ProjectNode>, Map<String, ProjectItem>> {
         val pending = LinkedHashMap<String, ProjectItem>()

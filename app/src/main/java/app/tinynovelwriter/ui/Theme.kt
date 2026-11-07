@@ -26,7 +26,11 @@ object TinyColors {
     val syncSuccess: Color
         @Composable @ReadOnlyComposable get() = if (isSystemInDarkTheme()) Color(0xFF8FD19E) else Color(0xFF1E7A34)
 
-    /** Markup highlighting: novelWriter's default_light / default_dark syntax themes. */
+    /**
+     * Markup highlighting: novelWriter's default syntax themes, the `[Syntax]` section of
+     * `novelwriter/assets/themes/default_light.toml` and `default_dark.toml` (novelWriter 26.3b1).
+     * Notes like `green:L135` are the theme file's own values.
+     */
     val markup: MarkupColors
         @Composable @ReadOnlyComposable get() = if (isSystemInDarkTheme()) MARKUP_DARK else MARKUP_LIGHT
 
