@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.tinynovelwriter.novelwriter.Counting
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -212,7 +213,16 @@ private fun DocumentText(
                 cursorBrush = SolidColor(colors.primary),
                 visualTransformation = markup,
                 onTextLayout = { layout ->
+                    val old = vertical.layout
                     vertical.layout = layout
+                    // Rotating rewraps the text, so the same scroll offset would show another
+                    // part of it: keep the line at the top of the screen at the top instead.
+                    if (old != null && old.size.width != layout.size.width && old.layoutInput.text.text == layout.layoutInput.text.text) {
+                        val line = old.getLineForVerticalPosition((scroll.value - topPaddingPx).coerceAtLeast(0f))
+                        val newLine = layout.getLineForOffset(old.getLineStart(line))
+                        val top = (topPaddingPx + layout.getLineTop(newLine)).roundToInt()
+                        if (scroll.value > 0) scope.launch { scroll.scrollTo(top) }
+                    }
                     val before = caretBefore.top
                     if (before != null && layout.layoutInput.text.text == value.text) {
                         caretBefore.top = null

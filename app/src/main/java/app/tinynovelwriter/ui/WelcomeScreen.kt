@@ -4,6 +4,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,38 +48,54 @@ fun WelcomeScreen(missingPath: String?, onPicked: (path: String) -> Unit) {
     var error by remember { mutableStateOf<UiText?>(null) }
     val pick = rememberProjectFolderPicker(onPicked = { error = null; onPicked(it) }, onError = { error = it })
     Scaffold { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp, vertical = 32.dp)) {
-            AppIcon(48.dp)
-            Spacer(Modifier.height(24.dp))
-            if (missingPath == null) {
-                Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.headlineMedium)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.welcome_subtitle),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(32.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Step(1, stringResource(R.string.welcome_step_get))
-                    Step(2, stringResource(R.string.welcome_step_choose), stringResource(R.string.welcome_step_choose_detail))
+        // Scrolls when it doesn't fit (landscape); otherwise the button sits at the bottom.
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+            Column(
+                Modifier
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = maxHeight)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column { WelcomeText(missingPath) }
+                Column(Modifier.padding(top = 32.dp)) {
+                    error?.let {
+                        Text(it.resolve(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    Button(onClick = pick, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.welcome_choose)) }
                 }
-            } else {
-                Text(stringResource(R.string.welcome_moved_title), style = MaterialTheme.typography.headlineMedium)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.welcome_missing, readablePath(missingPath)),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
-            Spacer(Modifier.weight(1f))
-            error?.let {
-                Text(it.resolve(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(12.dp))
-            }
-            Button(onClick = pick, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.welcome_choose)) }
         }
+    }
+}
+
+@Composable
+private fun WelcomeText(missingPath: String?) {
+    AppIcon(48.dp)
+    Spacer(Modifier.height(24.dp))
+    if (missingPath == null) {
+        Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.welcome_subtitle),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(32.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Step(1, stringResource(R.string.welcome_step_get))
+            Step(2, stringResource(R.string.welcome_step_choose), stringResource(R.string.welcome_step_choose_detail))
+        }
+    } else {
+        Text(stringResource(R.string.welcome_moved_title), style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.welcome_missing, readablePath(missingPath)),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

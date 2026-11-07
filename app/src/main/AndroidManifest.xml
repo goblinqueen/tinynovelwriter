@@ -21,9 +21,12 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.Tiny">
+        <!-- Rotation and (dis)connecting a keyboard only redraw the screen instead of recreating
+             it, so edit mode, scroll position and unsaved text stay. Theme changes still recreate. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
