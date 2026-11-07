@@ -65,6 +65,8 @@ sealed interface ProjectState {
     data object Loading : ProjectState
     data class Loaded(val loaded: LoadedProject) : ProjectState
     data class Failed(val message: UiText) : ProjectState
+    /** The folder has no `nwProject.nwx` (moved, deleted, or not mounted). */
+    data object Missing : ProjectState
 }
 
 private data class TreeRow(val node: ProjectNode, val depth: Int)
@@ -78,28 +80,26 @@ fun ProjectScreen(
     /** Containers the user expanded or collapsed away from their default state. */
     toggled: Set<String>,
     onToggle: (handle: String) -> Unit,
-    syncLink: String,
+    /** Sync is turned on in Settings and a link is set: show the Sync button and sync failures. */
+    showSync: Boolean,
     syncStatus: SyncStatus,
-    typewriterPosition: Int,
-    onChangeSettings: (path: String, syncLink: String, typewriterPosition: Int) -> Unit,
+    onOpenSettings: () -> Unit,
     onSync: () -> Unit,
     onOpenDocument: (handle: String) -> Unit,
     refreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
-    var editingSettings by remember { mutableStateOf(false) }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { editingSettings = true }) {
+                    IconButton(onClick = onOpenSettings) {
                         Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.settings))
                     }
                 },
                 actions = {
-                    if (FolderSync.isValidLink(syncLink)) SyncButton(syncStatus, onSync)
+                    if (showSync) SyncButton(syncStatus, onSync)
                 },
             )
         },
@@ -108,60 +108,18 @@ fun ProjectScreen(
             when (state) {
                 ProjectState.Loading -> Message(stringResource(R.string.loading))
                 is ProjectState.Failed -> Message(stringResource(R.string.project_load_failed, state.message.resolve(), projectPath))
-                is ProjectState.Loaded -> ProjectTree(state.loaded, syncStatus, listState, toggled, onToggle, onOpenDocument)
+                ProjectState.Missing -> Message(stringResource(R.string.not_a_project, projectPath))
+                is ProjectState.Loaded -> ProjectTree(state.loaded, syncStatus.takeIf { showSync }, listState, toggled, onToggle, onOpenDocument)
             }
         }
-    }
-
-    if (editingSettings) {
-        var path by remember { mutableStateOf(projectPath) }
-        var link by remember { mutableStateOf(syncLink) }
-        val linkOk = link.isBlank() || FolderSync.isValidLink(link)
-        var position by remember { mutableStateOf(typewriterPosition.toString()) }
-        val positionValue = position.trim().toIntOrNull()?.takeIf { it in Typewriter.POSITIONS }
-        AlertDialog(
-            onDismissRequest = { editingSettings = false },
-            title = { Text(stringResource(R.string.settings)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(value = path, onValueChange = { path = it }, label = { Text(stringResource(R.string.settings_project_folder)) })
-                    OutlinedTextField(
-                        value = link,
-                        onValueChange = { link = it },
-                        label = { Text(stringResource(R.string.settings_sync_link)) },
-                        isError = !linkOk,
-                        supportingText = {
-                            Text(stringResource(R.string.settings_sync_link_help))
-                        },
-                    )
-                    OutlinedTextField(
-                        value = position,
-                        onValueChange = { position = it },
-                        label = { Text(stringResource(R.string.settings_typewriter_position)) },
-                        isError = positionValue == null,
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        supportingText = {
-                            Text(stringResource(R.string.settings_typewriter_position_help, Typewriter.POSITIONS.first, Typewriter.POSITIONS.last))
-                        },
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(enabled = linkOk && positionValue != null, onClick = {
-                    editingSettings = false
-                    onChangeSettings(path.trim(), link.trim(), positionValue ?: typewriterPosition)
-                }) { Text(stringResource(R.string.save)) }
-            },
-            dismissButton = { TextButton(onClick = { editingSettings = false }) { Text(stringResource(R.string.cancel)) } },
-        )
     }
 }
 
 @Composable
 private fun ProjectTree(
     loaded: LoadedProject,
-    syncStatus: SyncStatus,
+    /** Null when sync is turned off. */
+    syncStatus: SyncStatus?,
     listState: LazyListState,
     toggled: Set<String>,
     onToggle: (handle: String) -> Unit,
@@ -229,9 +187,9 @@ private fun syncFailureText(kind: String) = when (kind) {
 
 /** Only shown when something needs attention: a lock file, or the last sync failed. */
 @Composable
-private fun StatusCard(loaded: LoadedProject, sync: SyncStatus) {
+private fun StatusCard(loaded: LoadedProject, sync: SyncStatus?) {
     val lock = loaded.lock
-    val failed = sync.state as? SyncState.Failed
+    val failed = sync?.state as? SyncState.Failed
     if (lock == null && failed == null) return
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),

@@ -9,8 +9,6 @@
 
     <!-- Common -->
     <string name="loading">Loading…</string>
-    <string name="save">Save</string>
-    <string name="cancel">Cancel</string>
 
     <!-- Project tree -->
     <string name="settings">Settings</string>
@@ -26,13 +24,44 @@
     <string name="lock_open_on">Open in novelWriter on %1$s</string>
     <string name="lock_unknown_host">the PC</string>
 
-    <!-- Settings dialog -->
-    <string name="settings_project_folder">Project folder</string>
-    <string name="settings_sync_link">FolderSync sync link</string>
-    <string name="settings_sync_link_help">In FolderSync: Settings → enable automation, then the folderpair\'s Automation tab → copy the Sync link. Leave empty to not sync from here.</string>
-    <string name="settings_typewriter_position">Typewriter position, %</string>
-    <!-- %1$d and %2$d: the allowed range -->
-    <string name="settings_typewriter_position_help">While typing, the current line is kept this far down the visible area (%1$d–%2$d).</string>
+    <!-- First start, or the project folder is gone -->
+    <string name="welcome_title">Welcome</string>
+    <string name="welcome_subtitle">Let\'s open your novel.</string>
+    <string name="welcome_step_get">Get the project onto this phone</string>
+    <string name="welcome_step_choose">Choose its folder</string>
+    <string name="welcome_step_choose_detail">The one with nwProject.nwx in it.</string>
+    <string name="welcome_choose">Choose project folder</string>
+    <string name="welcome_moved_title">Your project has moved</string>
+    <!-- %1$s: the folder, e.g. Internal storage › Documents › NovelWriter -->
+    <string name="welcome_missing">Can\'t find it in %1$s.</string>
+    <string name="folder_not_project">That folder isn\'t a novelWriter project. Choose the one with nwProject.nwx.</string>
+    <string name="folder_not_local">Choose a folder on the phone or an SD card.</string>
+    <string name="storage_internal">Internal storage</string>
+    <string name="storage_sd">SD card</string>
+
+    <!-- Settings page -->
+    <string name="back">Back</string>
+    <string name="settings_project_change">Change</string>
+    <string name="settings_project_none">No folder chosen</string>
+    <string name="settings_sync_use">Use FolderSync link</string>
+    <string name="settings_sync_use_summary">Shows a Sync button above the project tree</string>
+    <string name="settings_sync_link_set">Link set up</string>
+    <string name="settings_sync_link_unset">No link yet</string>
+    <string name="settings_sync_paste">Paste link</string>
+    <string name="settings_sync_clear">Clear</string>
+    <string name="settings_sync_paste_invalid">The clipboard doesn\'t hold a FolderSync link.</string>
+    <string name="settings_sync_link_help">In FolderSync (requires Pro): Settings → enable automation, then the folderpair\'s Automation tab → copy the Sync link, and paste it here.</string>
+    <string name="settings_typewriter_position">Typewriter position</string>
+    <string name="settings_typewriter_position_help">How far down the screen the line you\'re typing stays</string>
+    <!-- %1$d: a number -->
+    <string name="percent">%1$d%%</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_phone">Phone</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <!-- %1$s: app name, %2$s: version -->
+    <string name="settings_about_version">%1$s %2$s</string>
+    <string name="settings_about_compat">Opens novelWriter 26.2+ projects</string>
 
     <!-- Sync button and results -->
     <string name="sync">Sync</string>

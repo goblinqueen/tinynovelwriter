@@ -34,7 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import app.tinynovelwriter.data.DEFAULT_PROJECT_PATH
+import app.tinynovelwriter.data.AppSettings
 import app.tinynovelwriter.data.FolderSync
 import app.tinynovelwriter.data.SyncHub
 import app.tinynovelwriter.data.ProjectFolder
@@ -48,17 +48,14 @@ import app.tinynovelwriter.ui.EditorStatus
 import app.tinynovelwriter.ui.ProjectScreen
 import app.tinynovelwriter.ui.ProjectState
 import app.tinynovelwriter.ui.TinyTheme
-import app.tinynovelwriter.ui.Typewriter
+import app.tinynovelwriter.ui.SettingsScreen
+import app.tinynovelwriter.ui.WelcomeScreen
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 
-private const val PREFS = "settings"
-private const val KEY_PROJECT_PATH = "projectPath"
-private const val KEY_SYNC_LINK = "folderSyncLink"
-private const val KEY_TYPEWRITER_POSITION = "typewriterPosition"
 private const val AUTOSAVE_DELAY_MS = 2000L
 
 class MainActivity : ComponentActivity() {
@@ -79,19 +76,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        val settings = AppSettings(getSharedPreferences(AppSettings.PREFS, MODE_PRIVATE))
         syncTracker = SyncHub.get(this)
         SyncHub.addListener(onSyncChange)
         setContent {
             TinyTheme {
                 if (hasAccess) {
                     App(
-                        initialPath = prefs.getString(KEY_PROJECT_PATH, null) ?: DEFAULT_PROJECT_PATH,
-                        savePath = { prefs.edit().putString(KEY_PROJECT_PATH, it).apply() },
-                        initialSyncLink = prefs.getString(KEY_SYNC_LINK, null).orEmpty(),
-                        saveSyncLink = { prefs.edit().putString(KEY_SYNC_LINK, it).apply() },
-                        initialTypewriterPosition = prefs.getInt(KEY_TYPEWRITER_POSITION, Typewriter.DEFAULT_POSITION),
-                        saveTypewriterPosition = { prefs.edit().putInt(KEY_TYPEWRITER_POSITION, it).apply() },
+                        settings = settings,
                         syncTracker = syncTracker,
                         syncVersion = syncVersion,
                         resumeCount = resumeCount,
@@ -129,30 +121,31 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun App(
-    initialPath: String,
-    savePath: (String) -> Unit,
-    initialSyncLink: String,
-    saveSyncLink: (String) -> Unit,
-    initialTypewriterPosition: Int,
-    saveTypewriterPosition: (Int) -> Unit,
+    settings: AppSettings,
     syncTracker: SyncTracker,
     /** Changes whenever [syncTracker] does; read so that its state is observed. */
     syncVersion: Int,
     resumeCount: Int,
     pauseCount: Int,
 ) {
-    var path by rememberSaveable { mutableStateOf(initialPath) }
-    var openHandle by rememberSaveable { mutableStateOf<String?>(null) }
+    // No project folder chosen yet (first start).
+    val path = settings.projectPath
+    if (path == null) {
+        WelcomeScreen(missingPath = null, onPicked = { settings.projectPath = it })
+        return
+    }
+
+    var openHandle by rememberSaveable(path) { mutableStateOf<String?>(null) }
+    // Saveable, so the settings page stays open when a theme change recreates the activity.
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // Tree view state lives here so it survives opening a document; reset when the folder changes.
     val treeListState = rememberSaveable(path, saver = LazyListState.Saver) { LazyListState() }
     var toggled by rememberSaveable(path) { mutableStateOf(setOf<String>()) }
-    val folder = ProjectFolder(File(path))
-    var syncLink by rememberSaveable { mutableStateOf(initialSyncLink) }
-    var typewriterPosition by rememberSaveable { mutableIntStateOf(initialTypewriterPosition) }
+    val folder = remember(path) { ProjectFolder(File(path)) }
     val context = LocalContext.current
     val sync: () -> Unit = {
-        if (syncLink.isNotBlank()) {
-            val error = FolderSync.startSync(context, syncLink)
+        if (settings.canSync) {
+            val error = FolderSync.startSync(context, settings.syncLink)
             if (error == null) syncTracker.noteSyncRequested() else Toast.makeText(context, error.resolve(context), Toast.LENGTH_LONG).show()
         }
     }
@@ -174,40 +167,35 @@ private fun App(
             try {
                 ProjectState.Loaded(folder.load())
             } catch (e: Exception) {
-                ProjectState.Failed(
-                    if (e is NotAProjectException) UiText.of(R.string.not_a_project, e.path) else UiText.of(e)
-                )
+                if (e is NotAProjectException) ProjectState.Missing else ProjectState.Failed(UiText.of(e))
             }
         }
         refreshing = false
     }
 
     val handle = openHandle
-    if (handle == null) {
+    val loaded = (projectState as? ProjectState.Loaded)?.loaded
+    if (projectState is ProjectState.Missing) {
+        // The chosen folder is gone or no longer a project.
+        WelcomeScreen(missingPath = path, onPicked = { settings.projectPath = it })
+    } else if (settingsOpen) {
+        SettingsScreen(settings, projectName = loaded?.project?.name?.ifEmpty { null }, onBack = { settingsOpen = false })
+    } else if (handle == null) {
         ProjectScreen(
             state = projectState,
             projectPath = path,
             listState = treeListState,
             toggled = toggled,
             onToggle = { toggled = if (it in toggled) toggled - it else toggled + it },
-            syncLink = syncLink,
+            showSync = settings.canSync,
             syncStatus = syncStatus,
-            typewriterPosition = typewriterPosition,
-            onChangeSettings = { newPath, newLink, newPosition ->
-                path = newPath
-                savePath(newPath)
-                syncLink = newLink
-                saveSyncLink(newLink)
-                typewriterPosition = newPosition
-                saveTypewriterPosition(newPosition)
-            },
+            onOpenSettings = { settingsOpen = true },
             onSync = sync,
             onOpenDocument = { openHandle = it },
             refreshing = refreshing,
             onRefresh = onRefresh,
         )
     } else {
-        val loaded = (projectState as? ProjectState.Loaded)?.loaded
         val item = loaded?.project?.items?.get(handle)?.takeIf { it.type == ItemType.FILE }
         val editor = remember(path, handle) { DocumentEditor(folder, handle) }
         SideEffect {
@@ -236,7 +224,7 @@ private fun App(
             onLeave = { openHandle = null },
             refreshing = refreshing,
             onRefresh = onRefresh,
-            typewriterPosition = typewriterPosition,
+            typewriterPosition = settings.typewriterPosition,
         )
     }
 }

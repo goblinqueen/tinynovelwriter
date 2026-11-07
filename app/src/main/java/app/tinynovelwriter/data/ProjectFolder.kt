@@ -16,8 +16,6 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 
-const val DEFAULT_PROJECT_PATH = "/storage/emulated/0/Documents/NovelWriter"
-
 private const val PROJECT_FILE = "nwProject.nwx"
 private const val INDEX_FILE = "index.json"
 

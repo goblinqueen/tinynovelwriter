@@ -1,5 +1,7 @@
 package app.tinynovelwriter.ui
 
+import android.app.UiModeManager
+import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -10,14 +12,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import app.tinynovelwriter.data.ThemeChoice
 
-/** Follows the system light/dark setting, with the wallpaper-based colours (Android 12+). */
+/**
+ * Light or dark as set by [applyTheme] (which follows the phone by default), with the
+ * wallpaper-based colours (Android 12+).
+ */
 @RequiresApi(Build.VERSION_CODES.S)
 @Composable
 fun TinyTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val colors = if (isSystemInDarkTheme()) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     MaterialTheme(colorScheme = colors, content = content)
+}
+
+/**
+ * Sets the app's light/dark mode. Android keeps it across launches and recreates the
+ * activity, so the window, status bar and every isSystemInDarkTheme() follow it.
+ */
+fun applyTheme(context: Context, choice: ThemeChoice) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val mode = when (choice) {
+        ThemeChoice.PHONE -> UiModeManager.MODE_NIGHT_AUTO
+        ThemeChoice.LIGHT -> UiModeManager.MODE_NIGHT_NO
+        ThemeChoice.DARK -> UiModeManager.MODE_NIGHT_YES
+    }
+    context.getSystemService(UiModeManager::class.java)?.setApplicationNightMode(mode)
 }
 
 /** App colours that Material's colour scheme doesn't cover, with light and dark variants. */
