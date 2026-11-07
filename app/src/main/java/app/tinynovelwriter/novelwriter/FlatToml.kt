@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 /**
  * The flat subset of TOML used by novelWriter document headers: one `key = value` per

@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 /** Characters, words and paragraphs, as novelWriter's standardCounter returns them. */
 data class TextCounts(val chars: Int, val words: Int, val paragraphs: Int)

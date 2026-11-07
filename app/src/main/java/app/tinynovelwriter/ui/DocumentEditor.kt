@@ -10,8 +10,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import app.tinynovelwriter.data.OpenedDocument
 import app.tinynovelwriter.data.ProjectFolder
 import app.tinynovelwriter.data.SaveResult
-import app.tinynovelwriter.format.AutoReplace
-import app.tinynovelwriter.format.HeaderItem
+import app.tinynovelwriter.novelwriter.AutoReplace
+import app.tinynovelwriter.novelwriter.HeaderItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex

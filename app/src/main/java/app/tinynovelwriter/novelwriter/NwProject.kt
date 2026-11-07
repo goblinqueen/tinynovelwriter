@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 import java.io.InputStream
 import javax.xml.parsers.DocumentBuilderFactory

@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 import java.security.MessageDigest
 import java.time.LocalDateTime

@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 /** Text plus selection after an edit; [start] == [end] is a plain caret. */
 data class Edited(val text: String, val start: Int, val end: Int)

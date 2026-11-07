@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 /**
  * Contents of `nwProject.lock`: `host;os;kernel;unixtime`, written by novelWriter on open.

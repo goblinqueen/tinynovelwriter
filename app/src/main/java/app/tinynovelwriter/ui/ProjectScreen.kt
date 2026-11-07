@@ -54,11 +54,11 @@ import app.tinynovelwriter.data.FolderSync
 import app.tinynovelwriter.data.LoadedProject
 import app.tinynovelwriter.data.SyncState
 import app.tinynovelwriter.data.SyncStatus
-import app.tinynovelwriter.format.FolderSummary
-import app.tinynovelwriter.format.ItemClass
-import app.tinynovelwriter.format.ItemType
-import app.tinynovelwriter.format.folderSummary
-import app.tinynovelwriter.format.ProjectNode
+import app.tinynovelwriter.novelwriter.FolderSummary
+import app.tinynovelwriter.novelwriter.ItemClass
+import app.tinynovelwriter.novelwriter.ItemType
+import app.tinynovelwriter.novelwriter.folderSummary
+import app.tinynovelwriter.novelwriter.ProjectNode
 
 /** Result of loading the project folder, as shown by [ProjectScreen]. */
 sealed interface ProjectState {

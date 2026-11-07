@@ -1,6 +1,6 @@
 package app.tinynovelwriter.ui
 
-import app.tinynovelwriter.format.ItemClass
+import app.tinynovelwriter.novelwriter.ItemClass
 import app.tinynovelwriter.resolve
 import app.tinynovelwriter.R
 import androidx.compose.ui.res.stringResource
@@ -51,7 +51,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.tinynovelwriter.format.Counting
+import app.tinynovelwriter.novelwriter.Counting
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

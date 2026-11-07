@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 /**
  * A novelWriter item handle: exactly 13 lower-case hex characters.

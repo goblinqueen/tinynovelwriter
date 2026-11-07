@@ -1,10 +1,10 @@
 package app.tinynovelwriter.data
 
-import app.tinynovelwriter.format.DocumentReader
-import app.tinynovelwriter.format.HeaderItem
-import app.tinynovelwriter.format.ItemClass
-import app.tinynovelwriter.format.ItemLayout
-import app.tinynovelwriter.format.isHandle
+import app.tinynovelwriter.novelwriter.DocumentReader
+import app.tinynovelwriter.novelwriter.HeaderItem
+import app.tinynovelwriter.novelwriter.ItemClass
+import app.tinynovelwriter.novelwriter.ItemLayout
+import app.tinynovelwriter.novelwriter.isHandle
 import java.io.File
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals

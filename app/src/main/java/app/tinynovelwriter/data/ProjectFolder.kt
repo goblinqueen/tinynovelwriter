@@ -1,15 +1,15 @@
 package app.tinynovelwriter.data
 
-import app.tinynovelwriter.format.DocumentReader
-import app.tinynovelwriter.format.DocumentWriter
-import app.tinynovelwriter.format.HeaderItem
-import app.tinynovelwriter.format.LockFile
-import app.tinynovelwriter.format.LockInfo
-import app.tinynovelwriter.format.NwDocument
-import app.tinynovelwriter.format.NwProject
-import app.tinynovelwriter.format.ProjectXml
-import app.tinynovelwriter.format.formatTimestamp
-import app.tinynovelwriter.format.isHandle
+import app.tinynovelwriter.novelwriter.DocumentReader
+import app.tinynovelwriter.novelwriter.DocumentWriter
+import app.tinynovelwriter.novelwriter.HeaderItem
+import app.tinynovelwriter.novelwriter.LockFile
+import app.tinynovelwriter.novelwriter.LockInfo
+import app.tinynovelwriter.novelwriter.NwDocument
+import app.tinynovelwriter.novelwriter.NwProject
+import app.tinynovelwriter.novelwriter.ProjectXml
+import app.tinynovelwriter.novelwriter.formatTimestamp
+import app.tinynovelwriter.novelwriter.isHandle
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files

@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 /**
  * What a stretch of text is, for highlighting. Mirrors novelWriter's editor formats.

@@ -12,7 +12,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import app.tinynovelwriter.format.FormatToggle
+import app.tinynovelwriter.novelwriter.FormatToggle
 import java.text.BreakIterator
 
 /**

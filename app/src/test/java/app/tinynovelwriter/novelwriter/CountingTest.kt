@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

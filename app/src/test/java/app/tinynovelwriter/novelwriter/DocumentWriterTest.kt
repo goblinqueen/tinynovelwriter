@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 import java.time.LocalDateTime
 import org.junit.Assert.assertArrayEquals

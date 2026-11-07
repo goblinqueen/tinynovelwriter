@@ -1,6 +1,6 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
-import app.tinynovelwriter.format.Markup.*
+import app.tinynovelwriter.novelwriter.Markup.*
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

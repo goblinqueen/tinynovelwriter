@@ -1,4 +1,4 @@
-package app.tinynovelwriter.format
+package app.tinynovelwriter.novelwriter
 
 /**
  * Typing replacements, ported from novelWriter's `TextAutoReplace` (text/autoreplace.py),

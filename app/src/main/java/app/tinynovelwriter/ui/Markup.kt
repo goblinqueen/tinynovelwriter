@@ -9,10 +9,10 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
-import app.tinynovelwriter.format.Highlighter
-import app.tinynovelwriter.format.ItemClass
-import app.tinynovelwriter.format.Markup
-import app.tinynovelwriter.format.MarkupSpan
+import app.tinynovelwriter.novelwriter.Highlighter
+import app.tinynovelwriter.novelwriter.ItemClass
+import app.tinynovelwriter.novelwriter.Markup
+import app.tinynovelwriter.novelwriter.MarkupSpan
 
 /** Colours for novelWriter markup, named after novelWriter's syntax theme entries. */
 data class MarkupColors(

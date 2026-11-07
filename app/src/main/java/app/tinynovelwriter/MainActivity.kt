@@ -40,8 +40,8 @@ import app.tinynovelwriter.data.SyncHub
 import app.tinynovelwriter.data.ProjectFolder
 import app.tinynovelwriter.data.SyncStatus
 import app.tinynovelwriter.data.SyncTracker
-import app.tinynovelwriter.format.HeaderItem
-import app.tinynovelwriter.format.ItemType
+import app.tinynovelwriter.novelwriter.HeaderItem
+import app.tinynovelwriter.novelwriter.ItemType
 import app.tinynovelwriter.ui.DocumentScreen
 import app.tinynovelwriter.ui.DocumentEditor
 import app.tinynovelwriter.ui.EditorStatus
