@@ -37,4 +37,13 @@ object Typewriter {
             else -> null
         }
     }
+
+    /**
+     * Where the caret goes when editing starts, so the page doesn't jump: null for the end
+     * of the text when that is on screen (carry on writing), otherwise the content y of the
+     * line at the typewriter [position]. [textBottom] is the bottom of the text in content pixels.
+     */
+    fun editStartY(scroll: Int, viewport: Int, textBottom: Float, position: Int = DEFAULT_POSITION): Float? =
+        if (viewport <= 0 || textBottom <= scroll + viewport) null
+        else scroll + viewport * position / 100f
 }
