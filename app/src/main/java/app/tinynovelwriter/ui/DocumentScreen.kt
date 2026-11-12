@@ -44,6 +44,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.Color
@@ -79,7 +91,70 @@ fun DocumentScreen(
         }
     }
 
-    BackHandler(onBack = leave)
+    val scroll = rememberScrollState()
+    val vertical = remember { VerticalArrows() }
+    val topPaddingPx = with(LocalDensity.current) { TEXT_TOP_PADDING.toPx() }
+
+    val done: () -> Unit = { scope.launch { editor.save(); editor.editing = false } }
+    // Back while editing is Done; a second Back leaves. A hardware Esc arrives as Back
+    // while the keyboard app is active (and since Android 16 the app can't tell them
+    // apart), so this is also what makes Esc stop editing.
+    BackHandler { if (editor.editing) done() else leave() }
+    // Option C: the caret goes to the end if that's on screen, else to the line at the
+    // typewriter position, so starting to edit never moves the page.
+    val startEditing: () -> Unit = {
+        val length = editor.value.text.length
+        val layout = vertical.layout?.takeIf { it.layoutInput.text.length == length }
+        val caret = layout?.let {
+            Typewriter.editStartY(scroll.value, scroll.viewportSize, topPaddingPx + it.size.height, typewriterPosition)
+                ?.let { y -> it.getLineStart(it.getLineForVerticalPosition((y - topPaddingPx).coerceAtLeast(0f))) }
+        } ?: length
+        editor.onValueChange(editor.value.copy(selection = TextRange(caret)))
+        editor.editing = true
+    }
+
+    // Hardware keyboard outside the text field: in reading mode Up/Down scroll a line,
+    // PageUp/PageDown a screen, E starts editing; while editing Esc is Done (Android
+    // would otherwise turn it into Back).
+    val goal = remember { ScrollGoal() }
+    fun scrollTo(target: Int) {
+        goal.value = target.coerceIn(0, scroll.maxValue)
+        scope.launch { scroll.animateScrollTo(goal.value, tween(Typewriter.DURATION_MS)) }
+    }
+    fun scrollBy(delta: Float) {
+        val base = if (scroll.isScrollInProgress) goal.value else scroll.value
+        scrollTo(base + delta.roundToInt())
+    }
+    fun screenKey(event: KeyEvent): Boolean {
+        val down = event.type == KeyEventType.KeyDown
+        if (editor.editing) {
+            if (event.key != Key.Escape) return false
+            if (down) done()
+            return true
+        }
+        val line = vertical.layout?.takeIf { it.lineCount > 0 }?.let { it.getLineBottom(0) - it.getLineTop(0) } ?: 0f
+        val page = scroll.viewportSize - line
+        // Ctrl+Up/Down jump to the start/end, as Ctrl+Home/End do; Space and Shift+Space
+        // page as in a browser, for keyboards without PageUp/PageDown.
+        when (event.key) {
+            Key.DirectionUp -> if (down) { if (event.isCtrlPressed) scrollTo(0) else scrollBy(-line) }
+            Key.DirectionDown -> if (down) { if (event.isCtrlPressed) scrollTo(scroll.maxValue) else scrollBy(line) }
+            Key.MoveHome -> if (down) scrollTo(0)
+            Key.MoveEnd -> if (down) scrollTo(scroll.maxValue)
+            Key.PageUp -> if (down) scrollBy(-page)
+            Key.PageDown -> if (down) scrollBy(page)
+            Key.Spacebar -> if (down) scrollBy(if (event.isShiftPressed) -page else page)
+            Key.E -> {
+                if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed || !editor.canEdit) return false
+                if (down) startEditing()
+            }
+            else -> return false
+        }
+        return true
+    }
+    // In reading mode nothing else takes focus, so keys would go nowhere.
+    val screenFocus = remember { FocusRequester() }
+    LaunchedEffect(editor.editing) { if (!editor.editing) screenFocus.requestFocus() }
 
     Scaffold(
         topBar = {
@@ -95,13 +170,7 @@ fun DocumentScreen(
                         )
                     }
                     if (editor.canEdit) {
-                        TextButton(onClick = {
-                            if (editor.editing) {
-                                scope.launch { editor.save(); editor.editing = false }
-                            } else {
-                                editor.editing = true
-                            }
-                        }) { Text(stringResource(if (editor.editing) R.string.done else R.string.edit)) }
+                        TextButton(onClick = if (editor.editing) done else startEditing) { Text(stringResource(if (editor.editing) R.string.done else R.string.edit)) }
                     }
                 },
             )
@@ -126,14 +195,21 @@ fun DocumentScreen(
             PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = onRefresh,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onPreviewKeyEvent(::screenKey)
+                    .focusRequester(screenFocus)
+                    .focusable(),
             ) {
                 when (status) {
                     EditorStatus.Loading -> Message(stringResource(R.string.loading))
                     is EditorStatus.Unavailable -> Message(status.message.resolve())
                     else ->
                         if (text.isBlank() && !editor.editing) Message(stringResource(R.string.document_empty))
-                        else DocumentText(editor.value, editor::onValueChange, readOnly = !editor.editing, editor.item?.itemClass, typewriterPosition)
+                        else DocumentText(
+                            editor.value, editor::onValueChange, readOnly = !editor.editing, editor.item?.itemClass,
+                            typewriterPosition, scroll, vertical, topPaddingPx,
+                        )
                 }
             }
         }
@@ -168,11 +244,13 @@ private fun DocumentText(
     readOnly: Boolean,
     itemClass: ItemClass?,
     typewriterPosition: Int,
+    scroll: ScrollState,
+    vertical: VerticalArrows,
+    topPaddingPx: Float,
 ) {
     val colors = MaterialTheme.colorScheme
     val markupColors = TinyColors.markup
     val markup = remember(markupColors, itemClass) { MarkupTransformation(markupColors, itemClass ?: ItemClass.NOVEL) }
-    val scroll = rememberScrollState()
     // Tapping Edit leaves focus on the button, so a hardware keyboard's arrow keys would
     // move between buttons. Put focus in the text when editing starts.
     val focus = remember { FocusRequester() }
@@ -188,16 +266,20 @@ private fun DocumentText(
             if (hasHardwareKeyboard) softKeyboard?.hide()
         }
     }
-    val vertical = remember { VerticalArrows() }
     // Typewriter scrolling: an edit records the caret's top before it, the new layout
     // compares it with the caret's top after it.
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val topPadding = 12.dp
-    val topPaddingPx = with(density) { topPadding.toPx() }
     val caretBefore = remember { CaretBefore() }
     fun caretTop(layout: TextLayoutResult, offset: Int) =
         topPaddingPx + layout.getCursorRect(offset.coerceIn(0, layout.layoutInput.text.length)).top
+    // Moving the caret by keys doesn't relayout, so compare the two positions in the current layout.
+    fun followCaret(from: Int, to: Int) {
+        val layout = vertical.layout ?: return
+        Typewriter.target(caretTop(layout, from), caretTop(layout, to), scroll.value, scroll.viewportSize, typewriterPosition)?.let {
+            scope.launch { scroll.animateScrollTo(it, tween(Typewriter.DURATION_MS)) }
+        }
+    }
     val change: (TextFieldValue) -> Unit = { new ->
         if (!readOnly && new.text != value.text) vertical.layout?.let { caretBefore.top = caretTop(it, value.selection.end) }
         onValueChange(new)
@@ -245,10 +327,13 @@ private fun DocumentText(
                             ?: horizontalArrow(event, value)
                             ?: vertical.handle(event, value)
                             ?: return@onPreviewKeyEvent false
-                        if (moved != value) change(moved)
+                        if (moved != value) {
+                            if (moved.text == value.text) followCaret(value.selection.end, moved.selection.end)
+                            change(moved)
+                        }
                         true
                     }
-                    .padding(start = 16.dp, end = 24.dp, top = topPadding, bottom = 12.dp),
+                    .padding(start = 16.dp, end = 24.dp, top = TEXT_TOP_PADDING, bottom = 12.dp),
             )
             // Scroll past the end while editing, so the last line can reach the typewriter position.
             if (!readOnly) Spacer(Modifier.height(with(density) { (scroll.viewportSize * (100 - typewriterPosition) / 100f).toDp() }))
@@ -262,3 +347,10 @@ private fun DocumentText(
 private class CaretBefore {
     var top: Float? = null
 }
+
+/** Where key scrolling is heading, so repeated presses add up while the animation runs. */
+private class ScrollGoal {
+    var value = 0
+}
+
+private val TEXT_TOP_PADDING = 12.dp
