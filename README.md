@@ -19,6 +19,10 @@ novelWriter 26.2+ and Android 11+
 Optional: to sync from inside the app, go to Settings → Use FolderSync link and paste the
 folderpair's Sync link (requires [FolderSync](https://foldersync.io/) Pro).
 
+## Tips and Tricks
+- `e` on open file enters edit mode, `esc` closes it
+-  Ctrl+Up / Ctrl+Down == Home / End in reading mode, Space / Shift+Space == Page Up / Page Down scrolls a page.
+
 ## Good to know
 
 - It only edits the text of existing documents. To add a chapter, write it into an existing
@@ -30,24 +34,6 @@ folderpair's Sync link (requires [FolderSync](https://foldersync.io/) Pro).
 - No undo yet.
 - Markup highlighting, `--`/`---` dashes, Ctrl+B / Ctrl+I and typewriter scrolling work as in
   novelWriter.
-
-## Hardware keyboard
-
-Reading a document:
-
-| Key | Does |
-|---|---|
-| E | Start editing: at the end if it's on screen, otherwise at the line you're looking at |
-| Up / Down | Scroll a line |
-| Space / Shift+Space, Page Up / Page Down | Scroll a page |
-| Ctrl+Up / Ctrl+Down, Home / End | Go to the start / end |
-
-Editing:
-
-| Key | Does |
-|---|---|
-| Esc (or Back) | Stop editing and save |
-| Up / Down | Move the caret; the page follows it like typewriter scrolling |
 
 ## License
 
