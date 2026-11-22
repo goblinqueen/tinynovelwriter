@@ -58,7 +58,7 @@ object ProjectXml {
 
     fun parse(bytes: ByteArray): NwProject = parse(parseXml(bytes))
 
-    /** The file as XML, for code that edits it (see [ProjectCounts]). */
+    /** The raw XML, for editing. */
     fun parseXml(bytes: ByteArray): XmlDocument = try {
         ElementTree.parse(bytes)
     } catch (e: XmlFormatException) {

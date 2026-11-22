@@ -113,10 +113,7 @@ class RealProjectTest {
         println("Byte-identical rewrites: ${files.size} of ${files.size}; changed by tree fields: $differentWithTreeNames")
     }
 
-    /**
-     * The project file must render back byte for byte, and writing every document's own
-     * counts must change only the counts that are stale. Reports only handles and numbers.
-     */
+    /** The project file must rewrite byte for byte. Reports only handles and numbers. */
     @Test
     fun projectFileRewritesByteIdenticalAndCountsMatch() {
         assumeTrue("NW_PROJECT not set", root != null && File(root, "nwProject.nwx").isFile)
@@ -124,7 +121,6 @@ class RealProjectTest {
         val file = ProjectXml.parseXml(original)
         val same = ElementTree.render(file)
         assertTrue("project file differs at byte ${firstDifference(original, same)}", original.contentEquals(same))
-        // Laying it out from scratch, as for structural edits, must change nothing either.
         val laidOut = ProjectXml.parseXml(original).also { ElementTree.reindent(it.root) }.let(ElementTree::render)
         assertTrue("reindented project file differs at byte ${firstDifference(original, laidOut)}", original.contentEquals(laidOut))
 

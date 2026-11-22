@@ -123,20 +123,13 @@ class ProjectFolder(val root: File) {
         return SaveResult.Saved(OpenedDocument(opened.handle, saved, FileStamp.of(file)))
     }
 
-    /**
-     * Writes a document's counts into `nwProject.nwx`; nothing else in it changes. Reads the
-     * file fresh each time, so edits made elsewhere since the tree was loaded are kept.
-     * Returns false when there was nothing to write (same counts, or the document is no
-     * longer in the project). The previous version is kept as `nwProject.nwx.bkp`.
-     * Losing this write costs nothing: novelWriter recounts when it rebuilds the index.
-     */
+    /** Writes a document's counts into `nwProject.nwx`, keeping the old file as `.bkp`. Returns false if nothing changed. */
     fun updateCounts(handle: String, counts: TextCounts): Boolean {
         val file = File(root, PROJECT_FILE)
         val original = file.readBytes()
         val xml = ProjectXml.parseXml(original)
         if (!ProjectCounts.set(xml, handle, counts)) return false
         runCatching { writeAtomically(File(root, "$PROJECT_FILE.bkp"), File(root, "$PROJECT_FILE.bkp.tmp"), original) }
-        // novelWriter uses the same temporary name (`Path.with_suffix(".tmp")`).
         writeAtomically(file, File(root, "nwProject.tmp"), ElementTree.render(xml))
         return true
     }

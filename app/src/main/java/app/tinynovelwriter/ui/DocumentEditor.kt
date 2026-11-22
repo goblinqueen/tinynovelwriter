@@ -50,7 +50,7 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
     /** Text as last loaded or saved; differs from [value] when there are unsaved edits. */
     private var savedText by mutableStateOf("")
     private val mutex = Mutex()
-    /** A save happened whose counts aren't in the project file yet. */
+    /** Saved since the counts were last written. */
     private var countsPending = false
     /** Called after every successful write, e.g. to remember that a sync is due. */
     var onWritten: () -> Unit = {}
@@ -123,11 +123,7 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
         !dirty && status == EditorStatus.Idle
     } }
 
-    /**
-     * Writes the saved text's counts into the project file, if this editor saved since the
-     * last time. Called when leaving the document and on pause, not after every autosave.
-     * Failures are ignored: novelWriter recounts when it rebuilds the index anyway.
-     */
+    /** Writes the counts into the project file if there was a save. Errors are ignored: novelWriter recounts anyway. */
     suspend fun writeCounts() = withContext(NonCancellable) { mutex.withLock {
         if (!countsPending) return@withLock
         countsPending = false

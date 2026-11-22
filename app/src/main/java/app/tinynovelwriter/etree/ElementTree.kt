@@ -1,13 +1,8 @@
 package app.tinynovelwriter.etree
 
-/**
- * An element shaped like Python's `xml.etree.ElementTree.Element`: attributes in insertion
- * order, [text] before the first child, [tail] after the end tag. Parsed whitespace is kept
- * in [text] and [tail], so an unchanged file renders back byte for byte.
- */
+/** Like Python's ElementTree `Element`: [text] comes before the first child, [tail] after the end tag. */
 class XmlElement(val tag: String, attributes: Map<String, String> = emptyMap()) {
     val attributes = LinkedHashMap(attributes)
-    /** Edit freely: insert, remove, reorder. */
     val children = mutableListOf<XmlElement>()
     var text: String? = null
     var tail: String? = null
@@ -21,39 +16,26 @@ class XmlElement(val tag: String, attributes: Map<String, String> = emptyMap()) 
     /** Children with this tag (ElementTree `findall`). */
     fun findAll(tag: String): List<XmlElement> = children.filter { it.tag == tag }
 
-    /** Appends a new child, like ElementTree `SubElement`. Call [ElementTree.reindent] before rendering. */
+    /** Appends a new child, like ElementTree `SubElement`. */
     fun subElement(tag: String, attributes: Map<String, String> = emptyMap()): XmlElement =
         XmlElement(tag, attributes).also { children += it }
 }
 
-/**
- * A parsed file: everything before the root element kept verbatim (BOM, XML declaration),
- * the root, and the file's line ending, which [ElementTree.render] writes back.
- */
+/** A parsed file. [prolog] is the text before the root element (the XML declaration), kept as is. */
 class XmlDocument(val prolog: String, val root: XmlElement, val lineEnding: String)
 
 class XmlFormatException(message: String) : Exception(message)
 
 /**
- * Reads and writes XML the way Python's ElementTree does, so files written by novelWriter
- * come back unchanged and our edits look like novelWriter's own saves. Knows nothing about
- * novelWriter's format.
- *
- * Not a general XML parser: it accepts what ElementTree writes (an XML declaration,
- * elements, attributes, text, character and the five predefined entity references) and
- * refuses comments, CDATA, DOCTYPE and processing instructions, so a file it doesn't fully
- * understand is never rewritten.
- *
- * Sources: Python 3.12 `xml/etree/ElementTree.py` (`_serialize_xml`, `_escape_cdata`,
- * `_escape_attrib`); novelWriter 26.3b1 `novelwriter/common.py` `xmlIndent` and
- * `core/projectxml.py` `ProjectXMLWriter.write` (UTF-8, the platform's line ending).
+ * Reads and writes XML exactly like Python's ElementTree, so novelWriter's files come back unchanged.
+ * Refuses comments, CDATA and DOCTYPE: a file it doesn't fully understand is never rewritten.
+ * Source: Python 3.12 `xml/etree/ElementTree.py` `_serialize_xml`; novelWriter 26.3b1, `novelwriter/core/projectxml.py` `ProjectXMLWriter.write`.
  */
 object ElementTree {
 
     fun parse(bytes: ByteArray): XmlDocument {
         val raw = bytes.toString(Charsets.UTF_8)
         val lineEnding = if ("\r\n" in raw) "\r\n" else "\n"
-        // XML end-of-line handling: the parser sees LF only.
         val text = raw.replace("\r\n", "\n")
         if ('\r' in text) throw XmlFormatException("mixed line endings")
         return Parser(text).parseDocument(lineEnding)
@@ -66,16 +48,7 @@ object ElementTree {
         return text.toByteArray(Charsets.UTF_8)
     }
 
-    /**
-     * Lays the whole tree out again, as novelWriter's next save would: it builds a fresh tree
-     * every time, so parsed whitespace never survives. Drops the whitespace-only text of
-     * elements that have children and every whitespace-only tail, then [indent]s. Leaf text
-     * is content and stays. Use this after inserting, moving or removing elements: [indent]
-     * alone on a parsed tree puts an appended element at the wrong depth, because the old
-     * last child's tail already holds the closing indentation.
-     * On a file novelWriter wrote, this changes nothing. An element whose children were all
-     * removed is a leaf now, so its old indentation text stays: set its text to null too.
-     */
+    /** Re-indents the whole tree the way novelWriter saves it. Call after adding, moving or removing elements. */
     fun reindent(root: XmlElement) {
         fun clear(el: XmlElement) {
             if (el.children.isNotEmpty() && el.text?.isBlank() == true) el.text = null
@@ -87,9 +60,8 @@ object ElementTree {
     }
 
     /**
-     * Fills in whitespace that's missing (null [XmlElement.text] / [XmlElement.tail]), two
-     * spaces per level; whitespace already there is left alone. Port of novelWriter's
-     * `xmlIndent`, which unlike the standard library's `ET.indent` only touches what's unset.
+     * Fills in missing indentation only.
+     * Source: novelWriter 26.3b1, `novelwriter/common.py` `xmlIndent`.
      */
     fun indent(root: XmlElement) {
         val indentations = mutableListOf("\n")
@@ -106,7 +78,6 @@ object ElementTree {
                     last = child
                 }
             }
-            // Dedent the last child (novelWriter only does this for one whose tail it set).
             last?.tail = indentations[level]
         }
         if (root.children.isNotEmpty()) indentChildren(root, 0)

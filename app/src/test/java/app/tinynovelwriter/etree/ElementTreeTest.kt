@@ -5,10 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
-/**
- * `input.xml` and `edited.xml` are made by Python's ElementTree and novelWriter's xmlIndent
- * (`src/test/resources/etree/make_fixtures.py`), so these compare against the real thing.
- */
+/** The fixtures are made by real Python ElementTree, see `make_fixtures.py`. */
 class ElementTreeTest {
 
     private fun resource(name: String): ByteArray = javaClass.getResourceAsStream("/etree/$name")!!.use { it.readBytes() }
@@ -82,11 +79,11 @@ class ElementTreeTest {
     fun removingAnElementThenReindentKeepsLayout() {
         val doc = ElementTree.parse(resource("edited.xml"))
         val content = doc.root.find("content")!!
-        content.children.removeAt(content.children.lastIndex) // the last child holds the closing indentation
+        content.children.removeAt(content.children.lastIndex)
         content.children.removeAt(1)
         val author = doc.root.find("project")!!.find("author")!!
         author.children.clear()
-        author.text = null // emptied by hand: see reindent
+        author.text = null // reindent doesn't clear text of emptied elements
         ElementTree.reindent(doc.root)
         assertArrayEquals(resource("input.xml"), ElementTree.render(doc))
     }

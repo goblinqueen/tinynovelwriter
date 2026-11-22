@@ -1,19 +1,11 @@
-"""Makes the fixtures for ElementTreeTest with Python's real ElementTree.
-
-Run from this folder with Python 3.12: python make_fixtures.py
-- input.xml: written by ElementTree + xmlIndent the way novelWriter saves a project.
-- edited.xml: input.xml after the edit ElementTreeTest.reindentMatchesFreshBuild repeats,
-  written the way novelWriter would: it builds a fresh tree on every save (so no parsed
-  whitespace survives) and runs xmlIndent on it.
-Both use CRLF line endings, like files novelWriter writes on Windows.
-"""
+"""Makes ElementTreeTest's fixtures with real ElementTree. Run here: python make_fixtures.py"""
 import xml.etree.ElementTree as ET
 
 DECLARATION = "<?xml version='1.0' encoding='utf-8'?>"
 
 
 def xmlIndent(xml):
-    """Copy of novelwriter/common.py xmlIndent (novelWriter 26.3b1); that module needs Qt."""
+    """Copy of novelWriter's xmlIndent (its module needs Qt)."""
     tree = xml.getroot() if isinstance(xml, ET.ElementTree) else xml
     if not isinstance(tree, ET.Element):
         return
@@ -48,7 +40,7 @@ def xmlIndent(xml):
 
 
 def write(root, path):
-    # As ProjectXMLWriter.write, with the declaration fixed instead of the locale's.
+    # Like novelWriter's ProjectXMLWriter.write.
     with open(path, mode="w", encoding="utf-8", errors="xmlcharrefreplace", newline="\r\n") as f:
         f.write(DECLARATION + "\n")
         ET.ElementTree(root).write(f, encoding="unicode")
@@ -79,8 +71,7 @@ item(content, "aaaaaaaaaaaa1", "DOCUMENT", 10, "Глава 1")
 xmlIndent(root)
 write(root, "input.xml")
 
-# Round trip: parsing and writing input.xml unchanged must give the same bytes. The parser
-# drops the newline after the root; xmlIndent, which novelWriter runs on every save, puts it back.
+# Round trip must give the same bytes (xmlIndent restores the final newline the parser drops).
 with open("input.xml", "rb") as f:
     original = f.read()
 tree = ET.parse("input.xml")
@@ -89,8 +80,7 @@ write(tree.getroot(), "roundtrip.tmp")
 with open("roundtrip.tmp", "rb") as f:
     assert f.read() == original, "input.xml doesn't round-trip in Python"
 
-# The edit ElementTreeTest repeats: append an item, insert one before the first
-# document, give a leaf element a child; then indent and write.
+# The edit ElementTreeTest repeats.
 root = tree.getroot()
 content = root.find("content")
 item(content, "aaaaaaaaaaaa3", "NOTE", 3, "Новая заметка")
@@ -102,7 +92,7 @@ ET.SubElement(root.find("project").find("author"), "first").text = "А"
 
 
 def fresh(elem):
-    """A new tree with the same tags, attributes and leaf texts, like ProjectXMLWriter builds."""
+    """A fresh copy of the tree: novelWriter builds a new tree on every save."""
     copy = ET.Element(elem.tag, attrib=dict(elem.attrib))
     if len(elem) == 0:
         copy.text = elem.text

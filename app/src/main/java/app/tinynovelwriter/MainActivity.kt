@@ -140,8 +140,7 @@ private fun App(
             if (error == null) syncTracker.noteSyncRequested() else Toast.makeText(context, error.resolve(context), Toast.LENGTH_LONG).show()
         }
     }
-    // Report "no response" if FolderSync's webhooks don't come in time. Checked while the
-    // app is visible; the timeouts are timestamps, so time in the background still counts.
+    // Report "no response" if FolderSync's webhooks don't come in time.
     LaunchedEffect(syncVersion) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (syncTracker.inProgress) {
@@ -157,7 +156,7 @@ private fun App(
     val onRefresh: () -> Unit = { refreshing = true; refreshCount++ }
 
     var projectVersion by remember { mutableIntStateOf(0) }
-    // Re-read on every resume (after a sync or a Settings round trip), refresh, and leaving a document.
+    // Re-read on resume, refresh, and leaving a document.
     val projectState by produceState<ProjectState>(ProjectState.Loading, path, refreshCount, projectVersion) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             value = withContext(Dispatchers.IO) {
@@ -224,7 +223,6 @@ private fun App(
         DocumentScreen(
             title = item?.name ?: "",
             editor = editor,
-            // Re-read the project so the tree shows the counts just written.
             onLeave = { openHandle = null; projectVersion++ },
             refreshing = refreshing,
             onRefresh = onRefresh,

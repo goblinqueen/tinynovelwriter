@@ -4,14 +4,12 @@ import app.tinynovelwriter.etree.XmlDocument
 import app.tinynovelwriter.etree.XmlElement
 
 /**
- * Writes a document's counts into the project file, as novelWriter does when it saves the
- * project: the item's `<meta>` counts and the totals on `<content>`. Nothing else changes.
- * Sources (novelWriter 26.3b1): `NWItem.pack` (`core/item.py`), `ProjectTree.sumCounts`
- * (`core/tree.py`), `ProjectXMLWriter.write` (`core/projectxml.py`).
+ * Writes a document's counts and the project totals into the `.nwx`, as novelWriter does.
+ * Source: novelWriter 26.3b1, `novelwriter/core/item.py` `NWItem.pack`, `novelwriter/core/tree.py` `ProjectTree.sumCounts`.
  */
 object ProjectCounts {
 
-    /** Returns true if anything changed; false if the item isn't a document in the file or already has these counts. */
+    /** Returns false if nothing changed. */
     fun set(file: XmlDocument, handle: String, counts: TextCounts): Boolean {
         val content = file.root.find("content") ?: return false
         val item = content.children.firstOrNull {
