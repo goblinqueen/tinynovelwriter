@@ -125,8 +125,8 @@ private fun ProjectTree(
     onToggle: (handle: String) -> Unit,
     onOpenDocument: (handle: String) -> Unit,
 ) {
-    // [toggled] holds containers the user flipped from their default (Trash starts collapsed).
-    val isCollapsed = { node: ProjectNode -> (node.item.handle in toggled) != collapsedByDefault(node) }
+    // [toggled] holds containers the user flipped from their default (see [collapsedByDefault]).
+    val isCollapsed = { node: ProjectNode, depth: Int -> (node.item.handle in toggled) != collapsedByDefault(node, depth) }
     val rows = flatten(loaded.project.roots, isCollapsed)
     val summaries = remember(loaded) {
         val map = HashMap<String, FolderSummary>()
@@ -152,7 +152,7 @@ private fun ProjectTree(
             items(rows, key = { it.node.item.handle }) { row ->
                 TreeRowView(
                     row = row,
-                    isCollapsed = isCollapsed(row.node),
+                    isCollapsed = isCollapsed(row.node, row.depth),
                     summary = summaries[row.node.item.handle],
                     onClick = {
                         val handle = row.node.item.handle
@@ -168,12 +168,20 @@ private fun ProjectTree(
     }
 }
 
-private fun collapsedByDefault(node: ProjectNode) =
-    node.item.type == ItemType.ROOT && node.item.itemClass == ItemClass.TRASH
+/**
+ * The tree opens two levels deep: folders under a root start collapsed, and Archive and Trash
+ * start collapsed whole. Documents never start collapsed: tapping one opens it, so a document's
+ * children could not be shown again. [depth] is 0 for roots.
+ */
+private fun collapsedByDefault(node: ProjectNode, depth: Int) = when (node.item.type) {
+    ItemType.ROOT -> node.item.itemClass in setOf(ItemClass.TRASH, ItemClass.ARCHIVE)
+    ItemType.FILE -> false
+    else -> depth >= 1
+}
 
-private fun flatten(nodes: List<ProjectNode>, isCollapsed: (ProjectNode) -> Boolean, depth: Int = 0): List<TreeRow> =
+private fun flatten(nodes: List<ProjectNode>, isCollapsed: (ProjectNode, Int) -> Boolean, depth: Int = 0): List<TreeRow> =
     nodes.flatMap { node ->
-        val children = if (isCollapsed(node)) emptyList() else flatten(node.children, isCollapsed, depth + 1)
+        val children = if (isCollapsed(node, depth)) emptyList() else flatten(node.children, isCollapsed, depth + 1)
         listOf(TreeRow(node, depth)) + children
     }
 
