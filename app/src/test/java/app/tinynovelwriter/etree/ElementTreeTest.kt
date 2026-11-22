@@ -89,6 +89,17 @@ class ElementTreeTest {
     }
 
     @Test
+    fun parsesSingleQuotesCharacterReferencesAndBom() {
+        val doc = ElementTree.parse("<a x='1 \"q\"'>&#x41;&#66;</a>".toByteArray())
+        assertEquals("1 \"q\"", doc.root["x"])
+        assertEquals("AB", doc.root.text)
+        assertEquals("<a x=\"1 &quot;q&quot;\">AB</a>", ElementTree.render(doc).toString(Charsets.UTF_8)) // as ElementTree writes it
+
+        val withBom = "﻿<?xml version='1.0' encoding='utf-8'?>\n<a />\n".toByteArray()
+        assertArrayEquals(withBom, ElementTree.render(ElementTree.parse(withBom)))
+    }
+
+    @Test
     fun refusesWhatItDoesNotUnderstand() {
         for (bad in listOf(
             "<a><!-- c --></a>",
