@@ -65,8 +65,7 @@ class MarkupTransformation(private val colors: MarkupColors, private val itemCla
 
     private val styles = Markup.entries.associateWith { colors.style(it) }
 
-    // filter() runs on the whole text after every keystroke; lines are cached so only
-    // changed ones are highlighted again. Cleared when it grows past any likely document.
+    // Highlighted lines are cached, so a keystroke only re-highlights changed lines.
     private val lineCache = HashMap<String, List<MarkupSpan>>()
 
     private fun cachedLine(line: String, inactive: Boolean): List<MarkupSpan> {

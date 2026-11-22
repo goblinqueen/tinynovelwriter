@@ -141,9 +141,7 @@ object ProjectXml {
     }
 
     /**
-     * Order comes from the file, not the `order` attribute; items may appear before
-     * their parent; non-root items whose parent is missing are left out; duplicates
-     * keep the first one.
+     * Order comes from the file; orphans are dropped, duplicates keep the first.
      * Source: novelWriter 26.3b1, `novelwriter/core/tree.py` `ProjectTree.unpack`.
      */
     private fun buildTree(parsed: List<ProjectItem>): Pair<List<ProjectNode>, Map<String, ProjectItem>> {

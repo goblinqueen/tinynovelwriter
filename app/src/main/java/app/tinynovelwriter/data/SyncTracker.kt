@@ -21,14 +21,8 @@ interface SyncStore {
 }
 
 /**
- * Whether saved edits have reached FolderSync's last successful sync. Every write is
- * timestamped; a successful-sync webhook covers writes made before the sync started: the
- * request time, the "starting" webhook, or (for a sync FolderSync ran by itself without a
- * "starting") [GRACE_MS] before the result arrived.
- *
- * A requested sync that sends no webhook within [START_TIMEOUT_MS] never started (e.g.
- * Android refused FolderSync's background service); one that started but sends no result
- * within [RUN_TIMEOUT_MS] is also reported as "noresponse".
+ * Whether saved edits have reached a successful FolderSync sync, and the last sync result.
+ * A sync that sends no webhook in time is reported as "noresponse".
  */
 class SyncTracker(private val store: SyncStore, private val clock: () -> Long = System::currentTimeMillis) {
 

@@ -15,12 +15,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import app.tinynovelwriter.novelwriter.FormatToggle
 import java.text.BreakIterator
 
-/**
- * Left/right arrows from a hardware keyboard. Android delivers them as D-pad keys and
- * Compose's text field lets them move focus to the buttons instead of the cursor, so
- * the editor handles them itself: move by character, Ctrl by word, Shift to select.
- * Returns the new value, or null if the event isn't a left/right arrow.
- */
+/** Left/right arrows from a hardware keyboard (Compose would move focus instead). Ctrl moves by word, Shift selects. */
 fun horizontalArrow(event: KeyEvent, value: TextFieldValue): TextFieldValue? {
     val left = event.key == Key.DirectionLeft
     if (!left && event.key != Key.DirectionRight) return null
@@ -39,11 +34,7 @@ fun horizontalArrow(event: KeyEvent, value: TextFieldValue): TextFieldValue? {
     return value.copy(selection = selection)
 }
 
-/**
- * Alt+Left/Right and Home/End: start or end of the visual line; Ctrl+Home/End: start or
- * end of the document. Shift selects. Returns null for other keys. Must run before
- * [horizontalArrow], which would otherwise take Alt+Left/Right as plain arrows.
- */
+/** Alt+Left/Right, Home/End: line start/end; Ctrl+Home/End: document start/end. Must run before [horizontalArrow]. */
 fun lineEdgeKey(event: KeyEvent, value: TextFieldValue, layout: TextLayoutResult?): TextFieldValue? {
     val toStart = when {
         event.key == Key.MoveHome || (event.isAltPressed && event.key == Key.DirectionLeft) -> true
@@ -72,11 +63,7 @@ fun lineEdgeKey(event: KeyEvent, value: TextFieldValue, layout: TextLayoutResult
     return value.copy(selection = selection)
 }
 
-/**
- * Up/down arrows from a hardware keyboard, for the same reason as [horizontalArrow]:
- * Compose moves focus out of the field at the first line. Moves one visual line using
- * the text layout, keeping the column across repeated presses; Shift selects.
- */
+/** Up/down arrows from a hardware keyboard: one visual line, keeping the column. Shift selects. */
 class VerticalArrows {
     /** The field's latest layout; set from BasicTextField's onTextLayout. */
     var layout: TextLayoutResult? = null

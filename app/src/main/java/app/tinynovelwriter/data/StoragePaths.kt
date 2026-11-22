@@ -1,21 +1,12 @@
 package app.tinynovelwriter.data
 
-/**
- * Turns a folder chosen in Android's folder picker into a plain file path, so the app
- * can keep using All files access instead of the picker's content URIs, and describes
- * paths for display.
- */
+/** Turns a folder from Android's folder picker into a plain file path, and formats paths for display. */
 object StoragePaths {
 
     /** The picker's provider for phone storage and SD cards. */
     const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
 
-    /**
-     * [treeDocumentId] is `DocumentsContract.getTreeDocumentId` of the picked URI, e.g.
-     * `primary:Documents/NovelWriter` or `1A2B-3C4D:Novels`. [primaryRoot] is the phone
-     * storage's path (`/storage/emulated/0`). Returns null for folders that aren't on
-     * the phone or an SD card, such as cloud locations offered in the picker.
-     */
+    /** [treeDocumentId] looks like `primary:Documents/NovelWriter`. Returns null for folders not on the phone or an SD card. */
     fun treePath(authority: String?, treeDocumentId: String?, primaryRoot: String): String? {
         if (authority != EXTERNAL_STORAGE_AUTHORITY || treeDocumentId == null) return null
         val colon = treeDocumentId.indexOf(':')

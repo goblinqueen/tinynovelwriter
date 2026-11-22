@@ -4,12 +4,8 @@ package app.tinynovelwriter.novelwriter
 data class Edited(val text: String, val start: Int, val end: Int)
 
 /**
- * Ctrl+B / Ctrl+I, ported from novelWriter's `GuiDocEditor._toggleFormat` with
- * `autoSelect` on: with no selection, the word around the caret is used. If the
- * selection is already wrapped in the marks they are removed, otherwise added. A
- * selection over several lines only uses its first line.
- * Source: novelWriter 26.3b1, `novelwriter/editor/editor.py` `GuiDocEditor._toggleFormat`.
- * Word selection from `_autoSelect`.
+ * Ctrl+B / Ctrl+I: wraps or unwraps the selection, or the word at the caret.
+ * Source: novelWriter 26.3b1, `novelwriter/editor/editor.py` `GuiDocEditor._toggleFormat`, `_autoSelect`.
  */
 object FormatToggle {
 

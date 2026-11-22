@@ -12,11 +12,7 @@ import app.tinynovelwriter.UiText
 import app.tinynovelwriter.data.StoragePaths
 import java.io.File
 
-/**
- * Android's folder picker for the project folder. The choice is turned into a plain
- * path (the app reads files with All files access, not through the picker's URI) and
- * must hold `nwProject.nwx`. Returns a function that opens the picker.
- */
+/** Android's folder picker for the project folder; returns a function that opens it. The choice becomes a plain path. */
 @Composable
 fun rememberProjectFolderPicker(onPicked: (path: String) -> Unit, onError: (UiText) -> Unit): () -> Unit {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
