@@ -30,10 +30,7 @@ folderpair's Sync link (requires [FolderSync](https://foldersync.io/) Pro).
 - If a document changed on the computer while you were editing, it asks which version to
   keep instead of overwriting.
 - Each phone save leaves a backup next to the document, `content/<handle>.md.bkp`. This is added because novelWriter sometimes silently overwrites open files.
-- Word counts in the tree are updated only after novelWriter rebuilds its index.
 - No undo yet.
-- Markup highlighting, `--`/`---` dashes, Ctrl+B / Ctrl+I and typewriter scrolling work as in
-  novelWriter.
 
 ## License
 
