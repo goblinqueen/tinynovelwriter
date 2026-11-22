@@ -84,10 +84,16 @@ fun DocumentScreen(
     val words = remember(text) { Counting.standardCounter(text).words }
     var askLeave by remember { mutableStateOf(false) }
 
-    // Leaving saves first; if that fails, ask instead of losing edits.
+    // Leaving saves first; if that fails, ask instead of losing edits. The counts go into
+    // the project file before the tree shows again.
     val leave: () -> Unit = {
         scope.launch {
-            if (editor.save()) onLeave() else askLeave = true
+            if (editor.save()) {
+                editor.writeCounts()
+                onLeave()
+            } else {
+                askLeave = true
+            }
         }
     }
 

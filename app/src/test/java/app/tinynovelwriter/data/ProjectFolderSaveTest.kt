@@ -4,6 +4,7 @@ import app.tinynovelwriter.novelwriter.DocumentReader
 import app.tinynovelwriter.novelwriter.HeaderItem
 import app.tinynovelwriter.novelwriter.ItemClass
 import app.tinynovelwriter.novelwriter.ItemLayout
+import app.tinynovelwriter.novelwriter.TextCounts
 import app.tinynovelwriter.novelwriter.isHandle
 import java.io.File
 import java.time.LocalDateTime
@@ -163,5 +164,34 @@ class ProjectFolderSaveTest {
         folder.saveDocument(folder.openDocument(handle)!!, "New.\n", item, now = now)
         assertEquals("other", other.readText())
         assertEquals(listOf("$handle.md", "$handle.md.bkp", "aaaaaaaaaaaa1.md").sorted(), contentFiles())
+    }
+
+    @Test
+    fun updateCountsWritesOnlyCountsAndKeepsPreviousVersion() {
+        val nwx = File(file.parentFile!!.parentFile, "nwProject.nwx")
+        val before = listOf(
+            "<?xml version='1.0' encoding='utf-8'?>",
+            "<novelWriterXML fileVersion=\"1.6\">",
+            "  <content items=\"1\" novelWords=\"2\" notesWords=\"0\" novelChars=\"14\" notesChars=\"0\">",
+            "    <item handle=\"$handle\" parent=\"ef33f19388131\" root=\"ef33f19388131\" order=\"0\" type=\"FILE\" class=\"NOVEL\" layout=\"DOCUMENT\">",
+            "      <meta expanded=\"no\" heading=\"H0\" charCount=\"14\" wordCount=\"2\" paraCount=\"1\" cursorPos=\"0\" />",
+            "      <name status=\"s\" import=\"i\" active=\"yes\">Глава 1</name>",
+            "    </item>",
+            "  </content>",
+            "</novelWriterXML>",
+            "",
+        ).joinToString("\r\n")
+        nwx.writeText(before)
+
+        assertFalse(folder.updateCounts(handle, TextCounts(chars = 14, words = 2, paragraphs = 1)))
+        assertFalse(File(nwx.parentFile, "nwProject.nwx.bkp").exists())
+
+        assertTrue(folder.updateCounts(handle, TextCounts(chars = 30, words = 5, paragraphs = 2)))
+        val expected = before
+            .replace("novelWords=\"2\" notesWords=\"0\" novelChars=\"14\"", "novelWords=\"5\" notesWords=\"0\" novelChars=\"30\"")
+            .replace("charCount=\"14\" wordCount=\"2\" paraCount=\"1\"", "charCount=\"30\" wordCount=\"5\" paraCount=\"2\"")
+        assertEquals(expected, nwx.readText())
+        assertEquals(before, File(nwx.parentFile, "nwProject.nwx.bkp").readText())
+        assertEquals(listOf("content", "nwProject.nwx", "nwProject.nwx.bkp"), nwx.parentFile!!.list()!!.sorted())
     }
 }

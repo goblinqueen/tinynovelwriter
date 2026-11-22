@@ -1,5 +1,6 @@
 package app.tinynovelwriter.data
 
+import app.tinynovelwriter.etree.ElementTree
 import app.tinynovelwriter.novelwriter.DocumentReader
 import app.tinynovelwriter.novelwriter.DocumentWriter
 import app.tinynovelwriter.novelwriter.HeaderItem
@@ -7,7 +8,9 @@ import app.tinynovelwriter.novelwriter.LockFile
 import app.tinynovelwriter.novelwriter.LockInfo
 import app.tinynovelwriter.novelwriter.NwDocument
 import app.tinynovelwriter.novelwriter.NwProject
+import app.tinynovelwriter.novelwriter.ProjectCounts
 import app.tinynovelwriter.novelwriter.ProjectXml
+import app.tinynovelwriter.novelwriter.TextCounts
 import app.tinynovelwriter.novelwriter.formatTimestamp
 import app.tinynovelwriter.novelwriter.isHandle
 import java.io.File
@@ -56,7 +59,7 @@ class ProjectFolder(val root: File) {
         val projectFile = File(root, PROJECT_FILE)
         if (!projectFile.isFile) throw NotAProjectException(root.path)
 
-        val project = projectFile.inputStream().use(ProjectXml::parse)
+        val project = ProjectXml.parse(projectFile.readBytes())
         val lockFile = File(root, LockFile.NAME)
         val lock = if (lockFile.isFile) LockFile.parse(lockFile.readText()) else null
         return LoadedProject(project, lock)
@@ -118,6 +121,24 @@ class ProjectFolder(val root: File) {
             lineEnding = previous.document.lineEnding,
         )
         return SaveResult.Saved(OpenedDocument(opened.handle, saved, FileStamp.of(file)))
+    }
+
+    /**
+     * Writes a document's counts into `nwProject.nwx`; nothing else in it changes. Reads the
+     * file fresh each time, so edits made elsewhere since the tree was loaded are kept.
+     * Returns false when there was nothing to write (same counts, or the document is no
+     * longer in the project). The previous version is kept as `nwProject.nwx.bkp`.
+     * Losing this write costs nothing: novelWriter recounts when it rebuilds the index.
+     */
+    fun updateCounts(handle: String, counts: TextCounts): Boolean {
+        val file = File(root, PROJECT_FILE)
+        val original = file.readBytes()
+        val xml = ProjectXml.parseXml(original)
+        if (!ProjectCounts.set(xml, handle, counts)) return false
+        runCatching { writeAtomically(File(root, "$PROJECT_FILE.bkp"), File(root, "$PROJECT_FILE.bkp.tmp"), original) }
+        // novelWriter uses the same temporary name (`Path.with_suffix(".tmp")`).
+        writeAtomically(file, File(root, "nwProject.tmp"), ElementTree.render(xml))
+        return true
     }
 
     /** Write [bytes] to [temp], flush it to disk, then rename it over [target] in one step. */

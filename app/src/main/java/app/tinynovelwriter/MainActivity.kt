@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -34,6 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import app.tinynovelwriter.data.AppSettings
 import app.tinynovelwriter.data.FolderSync
 import app.tinynovelwriter.data.SyncHub
@@ -54,6 +59,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val AUTOSAVE_DELAY_MS = 2000L
@@ -61,12 +67,6 @@ private const val AUTOSAVE_DELAY_MS = 2000L
 class MainActivity : ComponentActivity() {
 
     private var hasAccess by mutableStateOf(false)
-
-    /** Bumped on every resume so the project is re-read after sync or a Settings round trip. */
-    private var resumeCount by mutableIntStateOf(0)
-
-    /** Bumped on every pause so an open document saves before the app goes to the background. */
-    private var pauseCount by mutableIntStateOf(0)
 
     /** Bumped whenever the sync tracker changes, so Compose re-reads it. */
     private var syncVersion by mutableIntStateOf(0)
@@ -86,8 +86,6 @@ class MainActivity : ComponentActivity() {
                         settings = settings,
                         syncTracker = syncTracker,
                         syncVersion = syncVersion,
-                        resumeCount = resumeCount,
-                        pauseCount = pauseCount,
                     )
                 } else {
                     AccessScreen(onGrant = ::openAccessSettings)
@@ -104,12 +102,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         hasAccess = Environment.isExternalStorageManager()
-        resumeCount++
-    }
-
-    override fun onPause() {
-        pauseCount++
-        super.onPause()
     }
 
     private fun openAccessSettings() {
@@ -125,8 +117,6 @@ private fun App(
     syncTracker: SyncTracker,
     /** Changes whenever [syncTracker] does; read so that its state is observed. */
     syncVersion: Int,
-    resumeCount: Int,
-    pauseCount: Int,
 ) {
     // No project folder chosen yet (first start).
     val path = settings.projectPath
@@ -143,17 +133,21 @@ private fun App(
     var toggled by rememberSaveable(path) { mutableStateOf(setOf<String>()) }
     val folder = remember(path) { ProjectFolder(File(path)) }
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val sync: () -> Unit = {
         if (settings.canSync) {
             val error = FolderSync.startSync(context, settings.syncLink)
             if (error == null) syncTracker.noteSyncRequested() else Toast.makeText(context, error.resolve(context), Toast.LENGTH_LONG).show()
         }
     }
-    // Report "no response" if FolderSync's webhooks don't come in time.
-    LaunchedEffect(syncVersion, resumeCount) {
-        while (syncTracker.inProgress) {
-            delay(1000)
-            syncTracker.checkTimeout()
+    // Report "no response" if FolderSync's webhooks don't come in time. Checked while the
+    // app is visible; the timeouts are timestamps, so time in the background still counts.
+    LaunchedEffect(syncVersion) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (syncTracker.inProgress) {
+                delay(1000)
+                syncTracker.checkTimeout()
+            }
         }
     }
     val syncStatus = remember(syncVersion) { SyncStatus(syncTracker.state, syncTracker.unsynced) }
@@ -162,15 +156,19 @@ private fun App(
     var refreshing by remember { mutableStateOf(false) }
     val onRefresh: () -> Unit = { refreshing = true; refreshCount++ }
 
-    val projectState by produceState<ProjectState>(ProjectState.Loading, path, resumeCount, refreshCount) {
-        value = withContext(Dispatchers.IO) {
-            try {
-                ProjectState.Loaded(folder.load())
-            } catch (e: Exception) {
-                if (e is NotAProjectException) ProjectState.Missing else ProjectState.Failed(UiText.of(e))
+    var projectVersion by remember { mutableIntStateOf(0) }
+    // Re-read on every resume (after a sync or a Settings round trip), refresh, and leaving a document.
+    val projectState by produceState<ProjectState>(ProjectState.Loading, path, refreshCount, projectVersion) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            value = withContext(Dispatchers.IO) {
+                try {
+                    ProjectState.Loaded(folder.load())
+                } catch (e: Exception) {
+                    if (e is NotAProjectException) ProjectState.Missing else ProjectState.Failed(UiText.of(e))
+                }
             }
+            refreshing = false
         }
-        refreshing = false
     }
 
     val handle = openHandle
@@ -204,9 +202,11 @@ private fun App(
         }
 
         // Load, and pick up synced changes on resume or refresh (skipped while there are unsaved edits).
-        LaunchedEffect(editor, resumeCount, refreshCount) {
-            editor.reloadIfClean()
-            refreshing = false
+        LaunchedEffect(editor, refreshCount) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                editor.reloadIfClean()
+                refreshing = false
+            }
         }
         // Autosave 2 s after typing stops.
         LaunchedEffect(editor) {
@@ -216,12 +216,16 @@ private fun App(
             }
         }
         // Save when the app goes to the background.
-        LaunchedEffect(editor, pauseCount) { if (pauseCount > 0) editor.save() }
+        val scope = rememberCoroutineScope()
+        LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
+            scope.launch { if (editor.save()) editor.writeCounts() }
+        }
 
         DocumentScreen(
             title = item?.name ?: "",
             editor = editor,
-            onLeave = { openHandle = null },
+            // Re-read the project so the tree shows the counts just written.
+            onLeave = { openHandle = null; projectVersion++ },
             refreshing = refreshing,
             onRefresh = onRefresh,
             typewriterPosition = settings.typewriterPosition,
