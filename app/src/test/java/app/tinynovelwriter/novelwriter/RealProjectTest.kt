@@ -1,5 +1,6 @@
 package app.tinynovelwriter.novelwriter
 
+import app.tinynovelwriter.etree.ElementTree
 import java.io.File
 import java.security.MessageDigest
 import org.junit.Assert.assertEquals
@@ -18,7 +19,7 @@ class RealProjectTest {
     @Test
     fun readsEveryDocumentAndHashesMatch() {
         assumeTrue("NW_PROJECT not set", root != null && File(root, "nwProject.nwx").isFile)
-        val project = File(root, "nwProject.nwx").inputStream().use(ProjectXml::parse)
+        val project = ProjectXml.parse(File(root, "nwProject.nwx").readBytes())
         val files = File(root, "content").listFiles { f -> f.extension == "md" && isHandle(f.nameWithoutExtension) }!!
 
         assertTrue(files.isNotEmpty())
@@ -51,7 +52,7 @@ class RealProjectTest {
     @Test
     fun highlightsEveryDocument() {
         assumeTrue("NW_PROJECT not set", root != null && File(root, "nwProject.nwx").isFile)
-        val project = File(root, "nwProject.nwx").inputStream().use(ProjectXml::parse)
+        val project = ProjectXml.parse(File(root, "nwProject.nwx").readBytes())
         val files = File(root, "content").listFiles { f -> f.extension == "md" && isHandle(f.nameWithoutExtension) }!!
 
         val kinds = sortedMapOf<Markup, Int>()
@@ -80,7 +81,7 @@ class RealProjectTest {
     @Test
     fun unchangedDocumentsRewriteByteIdentical() {
         assumeTrue("NW_PROJECT not set", root != null && File(root, "nwProject.nwx").isFile)
-        val project = File(root, "nwProject.nwx").inputStream().use(ProjectXml::parse)
+        val project = ProjectXml.parse(File(root, "nwProject.nwx").readBytes())
         val files = File(root, "content").listFiles { f -> f.extension == "md" && isHandle(f.nameWithoutExtension) }!!
 
         val now = "2099-01-01 00:00:00" // would show up in the output if a date changed
@@ -110,6 +111,28 @@ class RealProjectTest {
             }
         }
         println("Byte-identical rewrites: ${files.size} of ${files.size}; changed by tree fields: $differentWithTreeNames")
+    }
+
+    /** The project file must rewrite byte for byte. Reports only handles and numbers. */
+    @Test
+    fun projectFileRewritesByteIdenticalAndCountsMatch() {
+        assumeTrue("NW_PROJECT not set", root != null && File(root, "nwProject.nwx").isFile)
+        val original = File(root, "nwProject.nwx").readBytes()
+        val file = ProjectXml.parseXml(original)
+        val same = ElementTree.render(file)
+        assertTrue("project file differs at byte ${firstDifference(original, same)}", original.contentEquals(same))
+        val laidOut = ProjectXml.parseXml(original).also { ElementTree.reindent(it.root) }.let(ElementTree::render)
+        assertTrue("reindented project file differs at byte ${firstDifference(original, laidOut)}", original.contentEquals(laidOut))
+
+        val files = File(root, "content").listFiles { f -> f.extension == "md" && isHandle(f.nameWithoutExtension) }!!
+        val changed = mutableListOf<String>()
+        for (f in files) {
+            val counts = Counting.standardCounter(DocumentReader.parse(f.readBytes()).text)
+            if (ProjectCounts.set(file, f.nameWithoutExtension, counts)) changed += f.nameWithoutExtension
+        }
+        val after = ElementTree.render(file)
+        println("Project file: ${original.size} bytes, byte-identical rewrite; documents with changed counts: $changed")
+        if (changed.isEmpty()) assertTrue("unchanged counts must give the same bytes", original.contentEquals(after))
     }
 
     private fun firstDifference(a: ByteArray, b: ByteArray): Int =

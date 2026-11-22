@@ -1,8 +1,9 @@
 package app.tinynovelwriter.novelwriter
 
-import java.io.InputStream
-import javax.xml.parsers.DocumentBuilderFactory
-import org.w3c.dom.Element
+import app.tinynovelwriter.etree.ElementTree
+import app.tinynovelwriter.etree.XmlDocument
+import app.tinynovelwriter.etree.XmlElement
+import app.tinynovelwriter.etree.XmlFormatException
 
 /**
  * Project file format version this app understands (novelWriter 26.2+).
@@ -50,23 +51,26 @@ data class NwProject(
 class ProjectFormatException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * Reads `nwProject.nwx`. Read-only: this app never writes the project file.
+ * Reads `nwProject.nwx`. The only writes are count updates, see [ProjectCounts].
  * Source: novelWriter 26.3b1, `novelwriter/core/projectxml.py` `ProjectXMLReader`.
  */
 object ProjectXml {
 
-    fun parse(input: InputStream): NwProject {
-        val doc = try {
-            newFactory().newDocumentBuilder().parse(input)
-        } catch (e: Exception) {
-            throw ProjectFormatException("Project file is not valid XML", e)
-        }
+    fun parse(bytes: ByteArray): NwProject = parse(parseXml(bytes))
 
-        val root = doc.documentElement
-        if (root.tagName != "novelWriterXML") {
-            throw ProjectFormatException("Not a novelWriter project file (root <${root.tagName}>)")
+    /** The raw XML, for editing. */
+    fun parseXml(bytes: ByteArray): XmlDocument = try {
+        ElementTree.parse(bytes)
+    } catch (e: XmlFormatException) {
+        throw ProjectFormatException("Project file is not valid XML (${e.message})", e)
+    }
+
+    fun parse(xml: XmlDocument): NwProject {
+        val root = xml.root
+        if (root.tag != "novelWriterXML") {
+            throw ProjectFormatException("Not a novelWriter project file (root <${root.tag}>)")
         }
-        val fileVersion = root.getAttribute("fileVersion")
+        val fileVersion = root["fileVersion"] ?: ""
         if (fileVersion != SUPPORTED_FILE_VERSION) {
             throw ProjectFormatException(
                 "Unsupported project format $fileVersion (need $SUPPORTED_FILE_VERSION, novelWriter 26.2 or newer)"
@@ -76,16 +80,16 @@ object ProjectXml {
         var name = ""
         var author = ""
         val parsed = mutableListOf<ProjectItem>()
-        for (section in root.childElements()) {
-            when (section.tagName) {
-                "project" -> for (child in section.childElements()) {
-                    when (child.tagName) {
-                        "name" -> name = child.textContent
-                        "author" -> author = child.textContent
+        for (section in root.children) {
+            when (section.tag) {
+                "project" -> for (child in section.children) {
+                    when (child.tag) {
+                        "name" -> name = child.text ?: ""
+                        "author" -> author = child.text ?: ""
                     }
                 }
-                "content" -> for (child in section.childElements()) {
-                    if (child.tagName == "item") parseItem(child)?.let(parsed::add)
+                "content" -> for (child in section.children) {
+                    if (child.tag == "item") parseItem(child)?.let(parsed::add)
                 }
             }
         }
@@ -94,41 +98,41 @@ object ProjectXml {
         return NwProject(
             name = name,
             author = author,
-            appVersion = root.getAttribute("appVersion"),
+            appVersion = root["appVersion"] ?: "",
             fileVersion = fileVersion,
             roots = roots,
             items = items,
         )
     }
 
-    private fun parseItem(el: Element): ProjectItem? {
-        val handle = el.getAttribute("handle")
+    private fun parseItem(el: XmlElement): ProjectItem? {
+        val handle = el["handle"] ?: return null
         if (!isHandle(handle)) return null
 
         var itemName = ""
         var heading = "H0"
         var wordCount = 0
         var active = false
-        for (child in el.childElements()) {
-            when (child.tagName) {
+        for (child in el.children) {
+            when (child.tag) {
                 "meta" -> {
-                    heading = child.getAttribute("heading").ifEmpty { "H0" }
-                    wordCount = child.getAttribute("wordCount").toIntOrNull() ?: 0
+                    heading = child["heading"]?.ifEmpty { null } ?: "H0"
+                    wordCount = child["wordCount"]?.toIntOrNull() ?: 0
                 }
                 "name" -> {
-                    itemName = child.textContent
-                    active = child.getAttribute("active") == "yes"
+                    itemName = child.text ?: ""
+                    active = child["active"] == "yes"
                 }
             }
         }
 
         return ProjectItem(
             handle = handle,
-            parent = el.getAttribute("parent").takeIf(::isHandle),
-            root = el.getAttribute("root").takeIf(::isHandle),
-            type = enumOr(el.getAttribute("type"), ItemType.NO_TYPE),
-            itemClass = enumOr(el.getAttribute("class"), ItemClass.NO_CLASS),
-            layout = enumOr(el.getAttribute("layout"), ItemLayout.NO_LAYOUT),
+            parent = el["parent"]?.takeIf(::isHandle),
+            root = el["root"]?.takeIf(::isHandle),
+            type = enumOr(el["type"], ItemType.NO_TYPE),
+            itemClass = enumOr(el["class"], ItemClass.NO_CLASS),
+            layout = enumOr(el["layout"], ItemLayout.NO_LAYOUT),
             name = itemName,
             heading = heading,
             wordCount = wordCount,
@@ -174,19 +178,8 @@ object ProjectXml {
         return roots to nodes.mapValues { it.value.item }
     }
 
-    private fun newFactory(): DocumentBuilderFactory = DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = false
-        isExpandEntityReferences = false
-        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-    }
-
     private const val MAX_DEPTH = 1000
 }
 
-private fun Element.childElements(): List<Element> {
-    val list = childNodes
-    return (0 until list.length).mapNotNull { list.item(it) as? Element }
-}
-
-private inline fun <reified T : Enum<T>> enumOr(value: String, default: T): T =
+private inline fun <reified T : Enum<T>> enumOr(value: String?, default: T): T =
     enumValues<T>().firstOrNull { it.name == value } ?: default

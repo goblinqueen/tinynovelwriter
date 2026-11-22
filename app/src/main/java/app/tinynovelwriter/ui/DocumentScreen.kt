@@ -87,7 +87,12 @@ fun DocumentScreen(
     // Leaving saves first; if that fails, ask instead of losing edits.
     val leave: () -> Unit = {
         scope.launch {
-            if (editor.save()) onLeave() else askLeave = true
+            if (editor.save()) {
+                editor.writeCounts()
+                onLeave()
+            } else {
+                askLeave = true
+            }
         }
     }
 

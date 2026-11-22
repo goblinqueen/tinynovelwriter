@@ -11,6 +11,7 @@ import app.tinynovelwriter.data.OpenedDocument
 import app.tinynovelwriter.data.ProjectFolder
 import app.tinynovelwriter.data.SaveResult
 import app.tinynovelwriter.novelwriter.AutoReplace
+import app.tinynovelwriter.novelwriter.Counting
 import app.tinynovelwriter.novelwriter.HeaderItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -49,6 +50,8 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
     /** Text as last loaded or saved; differs from [value] when there are unsaved edits. */
     private var savedText by mutableStateOf("")
     private val mutex = Mutex()
+    /** Saved since the counts were last written. */
+    private var countsPending = false
     /** Called after every successful write, e.g. to remember that a sync is due. */
     var onWritten: () -> Unit = {}
 
@@ -107,6 +110,7 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
                     is SaveResult.Saved -> {
                         opened = saved.opened
                         savedText = text
+                        countsPending = true
                         onWritten()
                         status = EditorStatus.Idle
                     }
@@ -117,6 +121,15 @@ class DocumentEditor(private val folder: ProjectFolder, val handle: String) {
             onFailure = { status = EditorStatus.Failed(UiText.of(it)) },
         )
         !dirty && status == EditorStatus.Idle
+    } }
+
+    /** Writes the counts into the project file if there was a save. Errors are ignored: novelWriter recounts anyway. */
+    suspend fun writeCounts() = withContext(NonCancellable) { mutex.withLock {
+        if (!countsPending) return@withLock
+        countsPending = false
+        val counts = Counting.standardCounter(savedText)
+        val written = withContext(Dispatchers.IO) { runCatching { folder.updateCounts(handle, counts) } }
+        if (written.getOrDefault(false)) onWritten()
     } }
 
     /** Conflict: drop the phone edits and show the version on disk. */

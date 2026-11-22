@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<novelWriterXML appVersion="26.2.2" fileVersion="1.6">
+  <project id="x" saveCount="4">
+    <name>Проект &amp; &lt;тест&gt; "q" 'a'</name>
+    <author />
+  </project>
+  <settings>
+    <autoReplace>
+      <entry key="&lt;a&gt; &amp; &quot;b&quot;&#10;c&#09;d&#13;">v &gt; w</entry>
+    </autoReplace>
+    <empty />
+  </settings>
+  <content items="2" novelWords="10" notesWords="5">
+    <item handle="aaaaaaaaaaaa0" parent="None" type="ROOT" class="NOVEL">
+      <meta expanded="yes" />
+      <name status="s1" import="i1">Роман</name>
+    </item>
+    <item handle="aaaaaaaaaaaa1" parent="aaaaaaaaaaaa0" root="aaaaaaaaaaaa0" order="0" type="FILE" class="NOVEL" layout="DOCUMENT">
+      <meta expanded="no" heading="H1" charCount="50" wordCount="10" paraCount="1" cursorPos="0" />
+      <name status="s1" import="i1" active="yes">Глава 1</name>
+    </item>
+  </content>
+</novelWriterXML>

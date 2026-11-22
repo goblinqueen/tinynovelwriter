@@ -23,7 +23,7 @@ class ProjectXmlTest {
         $content
           </content>
         </novelWriterXML>
-    """.trimIndent().byteInputStream()
+    """.trimIndent().toByteArray()
 
     private fun item(handle: String, parent: String?, type: String, cls: String = "NOVEL", name: String, layout: String? = null) = """
         <item handle="$handle" parent="${parent ?: "None"}" root="aaaaaaaaaaaa0" order="0" type="$type" class="$cls"${layout?.let { " layout=\"$it\"" } ?: ""}>
@@ -104,7 +104,7 @@ class ProjectXmlTest {
 
     @Test
     fun rejectsNonProjectFiles() {
-        assertThrows(ProjectFormatException::class.java) { ProjectXml.parse("<other/>".byteInputStream()) }
-        assertThrows(ProjectFormatException::class.java) { ProjectXml.parse("not xml".byteInputStream()) }
+        assertThrows(ProjectFormatException::class.java) { ProjectXml.parse("<other/>".toByteArray()) }
+        assertThrows(ProjectFormatException::class.java) { ProjectXml.parse("not xml".toByteArray()) }
     }
 }
