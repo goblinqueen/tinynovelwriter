@@ -13,15 +13,8 @@ enum class Markup {
 data class MarkupSpan(val start: Int, val end: Int, val kind: Markup)
 
 /**
- * Port of novelWriter's editor highlighter, with the user's settings: `**` bold only,
- * emphasis coloured, no dialogue highlighting.
- * Differences: tags can't be checked against the index, so every value of a valid
- * keyword counts as a good tag; invalid keywords and values get no style (novelWriter
- * gives them a squiggly underline).
- *
- * Spans are meant to be applied in order, each merged over the earlier ones, like
- * `QTextCharFormat.merge`. Markup characters (`**`, `_`, brackets) take no later styles.
- *
+ * Port of novelWriter's editor highlighter with the user's settings (`**` bold only, no dialogue); tags aren't checked against the index.
+ * Spans are applied in order, each merged over the earlier ones.
  * Source: novelWriter 26.3b1, `novelwriter/editor/highlighter.py` `GuiDocHighlighter.highlightBlock`.
  */
 object Highlighter {
@@ -37,9 +30,7 @@ object Highlighter {
 
     private class Rule(val regex: Regex, val groups: Map<Int, Markup>)
 
-    // Patterns from novelWriter 26.3b1: `novelwriter/text/patterns.py` (REGEX_PATTERNS) and
-    // `novelwriter/constants.py` (nwRegEx); which groups get which style, and the rule
-    // order, from GuiDocHighlighter.initHighlighter.
+    // Source: novelWriter 26.3b1, `novelwriter/text/patterns.py`, `novelwriter/constants.py`; rule order from `GuiDocHighlighter.initHighlighter`.
 
     private val NOBREAK = Rule(Regex("[  ]+"), mapOf(0 to Markup.NOBREAK))
     private val ITALIC = Rule(emphasis("_", "_"), mapOf(1 to Markup.MARKUP, 2 to Markup.ITALIC, 3 to Markup.MARKUP))

@@ -8,14 +8,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import kotlin.concurrent.thread
 
-/**
- * A tiny HTTP listener on 127.0.0.1 for FolderSync's webhooks. The user configures one
- * webhook per event, each POSTing to `http://127.0.0.1:8765/<event>` (successful, failed,
- * cancelled, starting). The path is all the app uses: FolderSync's JSON body reports
- * `transferredFiles` as 0 even when files were uploaded. Runs while the process is alive, not just while visible: the sync
- * trigger pauses the app and the webhook arrives after that. Anything else on the phone
- * could call it too, which at worst changes the sync status shown.
- */
+/** Plain-HTTP listener on 127.0.0.1:8765 for FolderSync's webhooks. Only the path (`/successful`, `/failed`, ...) is used. */
 object WebhookListener {
     const val PORT = 8765
     private const val TAG = "TNW-Webhook"

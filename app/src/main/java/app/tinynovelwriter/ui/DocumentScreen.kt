@@ -101,12 +101,9 @@ fun DocumentScreen(
     val topPaddingPx = with(LocalDensity.current) { TEXT_TOP_PADDING.toPx() }
 
     val done: () -> Unit = { scope.launch { editor.save(); editor.editing = false } }
-    // Back while editing is Done; a second Back leaves. A hardware Esc arrives as Back
-    // while the keyboard app is active (and since Android 16 the app can't tell them
-    // apart), so this is also what makes Esc stop editing.
+    // Back while editing is Done, otherwise leaves. A hardware Esc arrives as Back too.
     BackHandler { if (editor.editing) done() else leave() }
-    // Option C: the caret goes to the end if that's on screen, else to the line at the
-    // typewriter position, so starting to edit never moves the page.
+    // The caret goes to the end if it's visible, else to the typewriter line, so the page doesn't move.
     val startEditing: () -> Unit = {
         val length = editor.value.text.length
         val layout = vertical.layout?.takeIf { it.layoutInput.text.length == length }
@@ -118,9 +115,7 @@ fun DocumentScreen(
         editor.editing = true
     }
 
-    // Hardware keyboard outside the text field: in reading mode Up/Down scroll a line,
-    // PageUp/PageDown a screen, E starts editing; while editing Esc is Done (Android
-    // would otherwise turn it into Back).
+    // Hardware keys outside the text field: Up/Down and PageUp/PageDown scroll, E edits, Esc is Done.
     val goal = remember { ScrollGoal() }
     fun scrollTo(target: Int) {
         goal.value = target.coerceIn(0, scroll.maxValue)
@@ -139,8 +134,7 @@ fun DocumentScreen(
         }
         val line = vertical.layout?.takeIf { it.lineCount > 0 }?.let { it.getLineBottom(0) - it.getLineTop(0) } ?: 0f
         val page = scroll.viewportSize - line
-        // Ctrl+Up/Down jump to the start/end, as Ctrl+Home/End do; Space and Shift+Space
-        // page as in a browser, for keyboards without PageUp/PageDown.
+        // Ctrl+Up/Down jump to start/end; Space and Shift+Space page, as in a browser.
         when (event.key) {
             Key.DirectionUp -> if (down) { if (event.isCtrlPressed) scrollTo(0) else scrollBy(-line) }
             Key.DirectionDown -> if (down) { if (event.isCtrlPressed) scrollTo(scroll.maxValue) else scrollBy(line) }
@@ -256,11 +250,9 @@ private fun DocumentText(
     val colors = MaterialTheme.colorScheme
     val markupColors = TinyColors.markup
     val markup = remember(markupColors, itemClass) { MarkupTransformation(markupColors, itemClass ?: ItemClass.NOVEL) }
-    // Tapping Edit leaves focus on the button, so a hardware keyboard's arrow keys would
-    // move between buttons. Put focus in the text when editing starts.
+    // Focus the text when editing starts; otherwise arrow keys move between buttons.
     val focus = remember { FocusRequester() }
-    // Focusing the field pops up the on-screen keyboard even when a hardware keyboard is
-    // connected (Android only hides it once typing starts), so hide it right away then.
+    // Focusing pops up the on-screen keyboard even with a hardware keyboard, so hide it.
     val softKeyboard = LocalSoftwareKeyboardController.current
     val config = LocalConfiguration.current
     val hasHardwareKeyboard = config.keyboard == Configuration.KEYBOARD_QWERTY &&
@@ -271,8 +263,7 @@ private fun DocumentText(
             if (hasHardwareKeyboard) softKeyboard?.hide()
         }
     }
-    // Typewriter scrolling: an edit records the caret's top before it, the new layout
-    // compares it with the caret's top after it.
+    // Typewriter scrolling: compare the caret's top before and after each edit.
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val caretBefore = remember { CaretBefore() }
@@ -302,8 +293,7 @@ private fun DocumentText(
                 onTextLayout = { layout ->
                     val old = vertical.layout
                     vertical.layout = layout
-                    // Rotating rewraps the text, so the same scroll offset would show another
-                    // part of it: keep the line at the top of the screen at the top instead.
+                    // Rotating rewraps the text: keep the top line at the top.
                     if (old != null && old.size.width != layout.size.width && old.layoutInput.text.text == layout.layoutInput.text.text) {
                         val line = old.getLineForVerticalPosition((scroll.value - topPaddingPx).coerceAtLeast(0f))
                         val newLine = layout.getLineForOffset(old.getLineStart(line))

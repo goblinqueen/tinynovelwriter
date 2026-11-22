@@ -8,12 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 
-/**
- * Starts a FolderSync sync through one of its automation deep links. FolderSync 4.x has
- * no broadcast for this; instead each install has its own links, shown on a folderpair's
- * Automation tab once automation is enabled in FolderSync's settings. The user pastes
- * the folderpair's "Sync" link into the app. Sync status (success/fail) is received via webhooks.
- */
+/** Starts a FolderSync sync by opening the folderpair's automation "Sync" link (FolderSync has no sync broadcast). */
 object FolderSync {
 
     private val PACKAGES = listOf("dk.tacit.android.foldersync.full", "dk.tacit.android.foldersync.lite")
@@ -25,10 +20,8 @@ object FolderSync {
     fun startSync(context: Context, link: String): UiText? {
         if (!isValidLink(link)) return UiText.of(R.string.sync_link_missing)
         val pkg = PACKAGES.firstOrNull { isInstalled(context, it) } ?: return UiText.of(R.string.sync_not_installed)
-        // Pinned to FolderSync, so the https link never opens in a browser. In a separate,
-        // throwaway task: FolderSync's trigger screen sends its task to the back when done,
-        // which would otherwise take this app to the home screen, or (in FolderSync's main
-        // task) flash FolderSync's own screen on the way back.
+        // Pinned to FolderSync so the link never opens in a browser. A throwaway task, because
+        // the trigger screen sends its task to the back when done.
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link.trim()))
             .setPackage(pkg)
             .addFlags(

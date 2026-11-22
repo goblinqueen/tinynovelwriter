@@ -169,9 +169,8 @@ private fun ProjectTree(
 }
 
 /**
- * The tree opens two levels deep: folders under a root start collapsed, and Archive and Trash
- * start collapsed whole. Documents never start collapsed: tapping one opens it, so a document's
- * children could not be shown again. [depth] is 0 for roots.
+ * The tree opens two levels deep; Archive and Trash start collapsed. Documents never do: tapping opens them.
+ * [depth] is 0 for roots.
  */
 private fun collapsedByDefault(node: ProjectNode, depth: Int) = when (node.item.type) {
     ItemType.ROOT -> node.item.itemClass in setOf(ItemClass.TRASH, ItemClass.ARCHIVE)

@@ -4,11 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 
-/**
- * The app's single [SyncTracker], tied to the process rather than to a screen. Android
- * can recreate the activity while the process (and the webhook listener) lives on; with
- * a tracker per activity, webhooks reached an old tracker and the visible one timed out.
- */
+/** The app's one [SyncTracker], per process: a tracker per activity missed webhooks after the activity was recreated. */
 object SyncHub {
     private var tracker: SyncTracker? = null
     private val listeners = LinkedHashSet<() -> Unit>()

@@ -75,9 +75,7 @@ class ProjectFolder(val root: File) {
     }
 
     /**
-     * Saves [text] over the document, the way novelWriter does: refuse if the file changed
-     * on disk since [opened] (unless [overwrite]), write `<handle>.tmp`, then atomically
-     * replace the `.md`. Header fields come from the tree via [item].
+     * Saves [text] like novelWriter: refuses if the file changed on disk (unless [overwrite]), then replaces it atomically.
      * Source: novelWriter 26.3b1, `novelwriter/core/document.py` `ProjectDocument.writeDocument`.
      */
     fun saveDocument(
@@ -104,9 +102,7 @@ class ProjectFolder(val root: File) {
         val rendered = DocumentWriter.render(text, item, previous.document, formatTimestamp(now))
         writeAtomically(file, File(contentDir, "${opened.handle}.tmp"), rendered.bytes)
 
-        // A copy of the phone's version, in case the PC later overwrites the document
-        // (novelWriter open there with stale text). One per document, replaced each save.
-        // novelWriter only picks up `<handle>.md` files, so it ignores these. Best effort.
+        // Copy of the phone's version, in case novelWriter on the PC overwrites it. novelWriter ignores `.bkp` files.
         runCatching {
             writeAtomically(File(contentDir, "${opened.handle}.md.bkp"), File(contentDir, "${opened.handle}.bkp.tmp"), rendered.bytes)
         }
@@ -149,12 +145,8 @@ class ProjectFolder(val root: File) {
     }
 
     /**
-     * After a phone edit novelWriter's index is stale, and it only re-indexes documents
-     * missing from it. Without `meta/index.json` its revision no longer matches the
-     * project file, so novelWriter rebuilds the whole index on the next open (with a
-     * "Rebuilding index" message). The old index is kept as `index.json.old`, replacing
-     * the previous one. Best effort: a failure here doesn't undo the save.
-     * The revision check is `Index.indexRebuild` (`novelwriter/core/index.py`, novelWriter 26.3b1).
+     * Moves `meta/index.json` aside so novelWriter rebuilds its index on the next open (it doesn't re-index changed documents).
+     * Source: novelWriter 26.3b1, `novelwriter/core/index.py` `Index.indexRebuild`.
      */
     private fun retireIndex() {
         val index = File(root, "meta/$INDEX_FILE")
