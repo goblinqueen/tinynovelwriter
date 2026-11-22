@@ -1,0 +1,2 @@
+# Test fixtures made by Python ElementTree with CRLF line endings; keep the bytes as they are.
+app/src/test/resources/etree/*.xml -text
