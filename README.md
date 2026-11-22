@@ -31,6 +31,24 @@ folderpair's Sync link (requires [FolderSync](https://foldersync.io/) Pro).
 - Markup highlighting, `--`/`---` dashes, Ctrl+B / Ctrl+I and typewriter scrolling work as in
   novelWriter.
 
+## Hardware keyboard
+
+Reading a document:
+
+| Key | Does |
+|---|---|
+| E | Start editing: at the end if it's on screen, otherwise at the line you're looking at |
+| Up / Down | Scroll a line |
+| Space / Shift+Space, Page Up / Page Down | Scroll a page |
+| Ctrl+Up / Ctrl+Down, Home / End | Go to the start / end |
+
+Editing:
+
+| Key | Does |
+|---|---|
+| Esc (or Back) | Stop editing and save |
+| Up / Down | Move the caret; the page follows it like typewriter scrolling |
+
 ## License
 
 GPL-3.0-or-later, see [LICENSE.md](LICENSE.md).
