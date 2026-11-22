@@ -100,7 +100,7 @@ class VerticalArrows {
     }
 }
 
-private fun previousWord(text: String, from: Int): Int {
+internal fun previousWord(text: String, from: Int): Int {
     val words = BreakIterator.getWordInstance().apply { setText(text) }
     var pos = words.preceding(from)
     // Skip back over spaces and punctuation to the start of a word.
@@ -108,7 +108,7 @@ private fun previousWord(text: String, from: Int): Int {
     return pos.coerceAtLeast(0)
 }
 
-private fun nextWord(text: String, from: Int): Int {
+internal fun nextWord(text: String, from: Int): Int {
     val words = BreakIterator.getWordInstance().apply { setText(text) }
     var pos = words.following(from)
     // Stop at the end of a word rather than after the following spaces.

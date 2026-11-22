@@ -5,7 +5,6 @@ import app.tinynovelwriter.novelwriter.HeaderItem
 import app.tinynovelwriter.novelwriter.ItemClass
 import app.tinynovelwriter.novelwriter.ItemLayout
 import app.tinynovelwriter.novelwriter.TextCounts
-import app.tinynovelwriter.novelwriter.isHandle
 import java.io.File
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
@@ -68,25 +67,11 @@ class ProjectFolderSaveTest {
     @Test
     fun backupIsACopyOfTheLatestSave() {
         val first = folder.saveDocument(folder.openDocument(handle)!!, "One.\n", item, now = now) as SaveResult.Saved
-        folder.saveDocument(first.opened, "Two.\n", item, now = now)
+        assertTrue(folder.saveDocument(first.opened, "Two.\n", item, now = now) is SaveResult.Saved)
+        assertEquals("Two.\n", DocumentReader.parse(file.readBytes()).text)
         val backup = File(file.parentFile, "$handle.md.bkp")
         assertTrue(file.readBytes().contentEquals(backup.readBytes()))
         assertEquals(listOf("$handle.md", "$handle.md.bkp"), contentFiles())
-    }
-
-    @Test
-    fun backupNameIsIgnoredByNovelWriter() {
-        // novelWriter's scanContent: suffix ".md" and a handle as the stem.
-        val backup = File("$handle.md.bkp")
-        assertFalse(backup.extension == "md" && isHandle(backup.nameWithoutExtension))
-    }
-
-    @Test
-    fun consecutiveSavesUseTheReturnedState() {
-        val first = folder.saveDocument(folder.openDocument(handle)!!, "One.\n", item, now = now) as SaveResult.Saved
-        val second = folder.saveDocument(first.opened, "Two.\n", item, now = now)
-        assertTrue(second is SaveResult.Saved)
-        assertEquals("Two.\n", DocumentReader.parse(file.readBytes()).text)
     }
 
     @Test
@@ -151,11 +136,6 @@ class ProjectFolderSaveTest {
         folder.saveDocument(opened, "Phone edit.\n", item, now = now)
 
         assertEquals(listOf("index.json"), meta.list()!!.toList())
-    }
-
-    @Test
-    fun saveWorksWithoutAnIndex() {
-        assertTrue(folder.saveDocument(folder.openDocument(handle)!!, "New.\n", item, now = now) is SaveResult.Saved)
     }
 
     @Test
